@@ -45,6 +45,9 @@ namespace Genode
 			/* RAM */
 			EMIF1_EMIF2_CS0_SDRAM_BASE = 0x80000000,
 			EMIF1_EMIF2_CS0_SDRAM_SIZE = 0x40000000,
+
+			/* L2 cache */
+			PL310_BASE = 0x48242000,
 		};
 	};
 }

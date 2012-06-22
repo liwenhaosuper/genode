@@ -55,6 +55,9 @@ namespace Genode
 			/* RAM */
 			LOCAL_DDR2_BASE = 0x60000000,
 			LOCAL_DDR2_SIZE = 0x40000000,
+
+			/* L2 cache */
+			PL310_BASE = 0x1e00a000,
 		};
 	};
 }
