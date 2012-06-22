@@ -1,0 +1,175 @@
+Index: kernel/fiasco/src/kern/arm/bsp/omap3/outer_cache-arm-omap4.cpp
+===================================================================
+--- kernel/fiasco/src/kern/arm/bsp/omap3/outer_cache-arm-omap4.cpp	(revision 0)
++++ kernel/fiasco/src/kern/arm/bsp/omap3/outer_cache-arm-omap4.cpp	(revision 0)
+@@ -0,0 +1,35 @@
++// ------------------------------------------------------------------------
++IMPLEMENTATION [arm && outer_cache_l2cxx0 && omap4_pandaboard]:
++
++extern "C" void omap4_smc(Mword fn, Mword arg);
++
++PUBLIC static
++void
++Outer_cache::init()
++{
++  /* initialized by hypervisor */
++
++  show_info();
++}
++
++IMPLEMENT
++void
++Outer_cache::platform_init() { }
++
++IMPLEMENT inline
++void
++Outer_cache::dbg_enable()
++{
++  /*
++   * call hypervisor to set write-through and disable cache linefills
++   * via the PL310 debug register, see errata 588369
++   */
++  omap4_smc(0x100, 0x3);
++}
++
++IMPLEMENT inline
++void
++Outer_cache::dbg_disable()
++{
++  omap4_smc(0x100, 0);
++}
+Index: kernel/fiasco/src/kern/arm/bsp/omap3/Modules
+===================================================================
+--- kernel/fiasco/src/kern/arm/bsp/omap3/Modules	(revision 38)
++++ kernel/fiasco/src/kern/arm/bsp/omap3/Modules	(working copy)
+@@ -22,3 +22,4 @@
+ reset_IMPL            += reset-arm-omap
+ clock_IMPL            += clock-generic
+ boot_mp_IMPL          += boot_mp-arm-omap4
++outer_cache_IMPL      += outer_cache-arm-omap4
+\ No newline at end of file
+Index: kernel/fiasco/src/kern/arm/bsp/omap3/mem_layout-arm-omap.cpp
+===================================================================
+--- kernel/fiasco/src/kern/arm/bsp/omap3/mem_layout-arm-omap.cpp	(revision 38)
++++ kernel/fiasco/src/kern/arm/bsp/omap3/mem_layout-arm-omap.cpp	(working copy)
+@@ -77,6 +77,8 @@
+     Devices3_phys_base       = 0x4a300000,
+     Devices4_phys_base       = 0x49000000,
+     Sdram_phys_base          = 0x80000000,
++
++    L2cxx0_phys_base         = Devices2_phys_base + 0x00042000,
+   };
+ 
+   enum Virt_layout_omap4_pandaboard {
+@@ -94,5 +96,7 @@
+     __PL310 = Devices2_map_base + 0x42000,
+ 
+     Prm_map_base            = Devices3_map_base + 0x6000,
++
++    L2cxx0_map_base         = Devices2_map_base + 0x42000,
+   };
+ };
+Index: kernel/fiasco/src/kern/arm/bsp/omap3/Kconfig
+===================================================================
+--- kernel/fiasco/src/kern/arm/bsp/omap3/Kconfig	(revision 38)
++++ kernel/fiasco/src/kern/arm/bsp/omap3/Kconfig	(working copy)
+@@ -24,6 +24,7 @@
+ 	bool "Pandaboard"
+ 	depends on PF_OMAP
+ 	select CAN_ARM_CPU_CORTEX_A9
++	select CAN_ARM_CACHE_L2CXX0
+ 	help
+ 	  Choose for Pandaboard.
+ 
+Index: kernel/fiasco/src/kern/arm/outer_cache-l2cxx0.cpp
+===================================================================
+--- kernel/fiasco/src/kern/arm/outer_cache-l2cxx0.cpp	(revision 38)
++++ kernel/fiasco/src/kern/arm/outer_cache-l2cxx0.cpp	(working copy)
+@@ -44,6 +44,8 @@
+   static Spin_lock<> _lock;
+ 
+   static void platform_init();
++  static void dbg_enable();
++  static void dbg_disable();
+ 
+ public:
+   enum
+@@ -101,17 +103,23 @@
+ void
+ Outer_cache::flush()
+ {
+-  write(CLEAN_BY_WAY, 0xff);
++  dbg_enable();
++  write(CLEAN_AND_INV_BY_WAY, 0xff);
++  while (Io::read<Mword>(CLEAN_AND_INV_BY_WAY) & 0xff)
++    ;
+   sync();
++  dbg_disable();
+ }
+ 
+ IMPLEMENT inline NEEDS[Outer_cache::write]
+ void
+ Outer_cache::flush(Mword phys_addr, bool do_sync = true)
+ {
++  dbg_enable();
+   write(CLEAN_AND_INV_LINE_BY_PA, phys_addr & (~0UL << Cache_line_shift));
+   if (do_sync)
+     sync();
++  dbg_disable();
+ }
+ 
+ IMPLEMENT inline NEEDS[Outer_cache::write]
+@@ -131,6 +139,12 @@
+     sync();
+ }
+ 
++STATIC_INITIALIZE_P(Outer_cache, STARTUP_INIT_PRIO);
++
++
++// ------------------------------------------------------------------------
++IMPLEMENTATION [arm && outer_cache_l2cxx0 && !omap4_pandaboard]:
++
+ PUBLIC static
+ void
+ Outer_cache::init()
+@@ -151,8 +165,14 @@
+   show_info();
+ }
+ 
+-STATIC_INITIALIZE_P(Outer_cache, STARTUP_INIT_PRIO);
++IMPLEMENT inline
++void
++Outer_cache::dbg_enable() { /* only needed for pl310 errata 588369 */ }
+ 
++IMPLEMENT inline
++void
++Outer_cache::dbg_disable() { /* only needed for pl310 errata 588369 */ }
++
+ // ------------------------------------------------------------------------
+ IMPLEMENTATION [arm && outer_cache_l2cxx0 && !debug]:
+ 
+Index: kernel/fiasco/src/kern/arm/ivt.S
+===================================================================
+--- kernel/fiasco/src/kern/arm/ivt.S	(revision 38)
++++ kernel/fiasco/src/kern/arm/ivt.S	(working copy)
+@@ -1192,3 +1192,20 @@
+ 	add	lr, lr, #(RF_SIZE - 4)		@ Read return address
+ 	ldmdb	lr, {pc}^			@ go back to interrupted insn 
+ #endif
++
++#if defined(CONFIG_PF_OMAP4_PANDABOARD)
++/**
++ * OMAP44xx (e.g. pandaboard) trustzone hypervisor-call
++ *
++ * save all registers, function number needs to be in r12,
++ * additional argument in r0
++ */
++	.global omap4_smc
++omap4_smc:
++		push {r0-r12, lr}
++		mov  r12, r0
++		mov  r0, r1
++		dsb
++		smc  #0
++		pop  {r0-r12, pc}
++#endif
