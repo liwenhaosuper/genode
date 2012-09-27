@@ -28,28 +28,54 @@
 #include <pl11x_defs.h>
 #include <sp810_defs.h>
 #include <video_memory.h>
-
-
+using namespace Genode;
 /***********************************************
  ** Implementation of the framebuffer service **
  ***********************************************/
 
 namespace Framebuffer
 {
-
+/**
 	enum {
-		SCR_WIDTH    =  640,
-		SCR_HEIGHT   =  480,
-		LEFT_MARGIN  =   64,
-		RIGHT_MARGIN =   32,
-		UPPER_MARGIN =    9,
-		LOWER_MARGIN =   11,
-		HSYNC_LEN    =   64,
-		VSYNC_LEN    =   25,
-
-		BYTES_PER_PIXEL  = 2,
+		SCR_WIDTH        = 640,
+		SCR_HEIGHT       = 480,
+		LEFT_MARGIN      =  48,
+		RIGHT_MARGIN     =  16,
+		UPPER_MARGIN     =  33,
+		LOWER_MARGIN     =  10,
+		HSYNC_LEN        =  96,
+		VSYNC_LEN        =   2,
+		BYTES_PER_PIXEL  =   2,
 		FRAMEBUFFER_SIZE = SCR_WIDTH*SCR_HEIGHT*BYTES_PER_PIXEL,
 	};
+**/
+
+	// VGA   640x480  48, 16, 33, 10,  96, 2
+	// SVGA  800x600  88, 40, 23,  1, 128, 4
+    // XGA  1024x768 160, 24, 29,  3, 136, 6
+	enum {
+		SCR_WIDTH        =  800,
+		SCR_HEIGHT       =  600,
+		LEFT_MARGIN      =   88,
+		RIGHT_MARGIN     =   40,
+		UPPER_MARGIN     =   23,
+		LOWER_MARGIN     =    1,
+		HSYNC_LEN        =  128,
+		VSYNC_LEN        =    4,
+		BYTES_PER_PIXEL  =    2,
+		FRAMEBUFFER_SIZE = SCR_WIDTH * SCR_HEIGHT * BYTES_PER_PIXEL,
+	};
+
+
+	enum System_configuration {
+		SYS_CFG_BASE = SMB_CS7,
+		SYS_CFG_SIZE = 0x1000,
+
+		SYS_CFG_DATA = 0xa0,
+		SYS_CFG_CTRL = 0xa4,
+		SYS_CFG_STAT = 0xa8
+	};
+
 
 	class Session_component : public Genode::Rpc_object<Session>
 	{
@@ -82,10 +108,10 @@ namespace Framebuffer
 			};
 
 			void sys_reg_write(unsigned reg, long value) {
-				*(volatile long *)(_sys_regs_base + sizeof(long)*reg) = value; }
+				*(volatile long *)(_sys_regs_base + reg) = value; }
 
 			long sys_reg_read(unsigned reg) {
-				return *(volatile long *)(_sys_regs_base + sizeof(long)*reg); }
+				return *(volatile long *)(_sys_regs_base + reg); }
 
 			void reg_write(unsigned reg, long value) {
 				*(volatile long *)(_regs_base + sizeof(long)*reg) = value; }
@@ -133,10 +159,43 @@ namespace Framebuffer
 
 				ctrl = CTRL_BGR | CTRL_ENABLED | CTRL_TFT | CTRL_VCOMP | CTRL_BPP16_565;
 
+				if (sys_reg_read(SYS_CFG_CTRL) & (1 << 31))
+					PERR("busy");
+				else {
+					unsigned long stat = sys_reg_read(SYS_CFG_STAT);
+					sys_reg_write(SYS_CFG_STAT, stat & ~1UL);
+					sys_reg_write(SYS_CFG_CTRL, (1 << 31) | (1 << 20) | (1 << 0));
+					while (!sys_reg_read(SYS_CFG_STAT));
+					if (sys_reg_read(SYS_CFG_STAT) & (1 << 1))
+						PERR("setting clock failed!");
+					printf("%ld\n", sys_reg_read(SYS_CFG_DATA));
+				}
+
 				/* init color-lcd oscillator */
-				sys_reg_write(SP810_REG_LOCK,    0xa05f);
-				sys_reg_write(SP810_REG_OSCCLCD, 0x2c77);
-				sys_reg_write(SP810_REG_LOCK,    0);
+				if (sys_reg_read(SYS_CFG_CTRL) & (1 << 31))
+					PERR("busy");
+				else {
+					unsigned long stat = sys_reg_read(SYS_CFG_STAT);
+					sys_reg_write(SYS_CFG_STAT, stat & ~1UL);
+					sys_reg_write(SYS_CFG_DATA, 40000000);
+					sys_reg_write(SYS_CFG_CTRL,
+					              (1 << 31) | (1 << 30) | (1 << 20) | (1 << 0));
+					while (!sys_reg_read(SYS_CFG_STAT));
+					if (sys_reg_read(SYS_CFG_STAT) & (1 << 1))
+						PERR("setting clock failed!");
+				}
+
+				if (sys_reg_read(SYS_CFG_CTRL) & (1 << 31))
+					PERR("busy");
+				else {
+					unsigned long stat = sys_reg_read(SYS_CFG_STAT);
+					sys_reg_write(SYS_CFG_STAT, stat & ~1UL);
+					sys_reg_write(SYS_CFG_CTRL, (1 << 31) | (1 << 20) | (1 << 0));
+					while (!sys_reg_read(SYS_CFG_STAT));
+					if (sys_reg_read(SYS_CFG_STAT) & (1 << 1))
+						PERR("setting clock failed!");
+					printf("%ld\n", sys_reg_read(SYS_CFG_DATA));
+				}
 
 				/* init video timing */
 				reg_write(PL11X_REG_TIMING0, tim0);
@@ -204,8 +263,8 @@ int main(int, char **)
 	Io_mem_connection lcd_io_mem(PL11X_LCD_PHYS, PL11X_LCD_SIZE);
 	void *lcd_base = env()->rm_session()->attach(lcd_io_mem.dataspace());
 
-	/* locally map system control registers */
-	Io_mem_connection sys_mem(SP810_PHYS, SP810_SIZE);
+	/* locally map system configuration registers */
+	Io_mem_connection sys_mem(Framebuffer::SYS_CFG_BASE, Framebuffer::SYS_CFG_SIZE);
 	void *sys_base = env()->rm_session()->attach(sys_mem.dataspace());
 
 	enum { STACK_SIZE = 4096 };
