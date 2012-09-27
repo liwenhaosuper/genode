@@ -11,15 +11,15 @@
  * under the terms of the GNU General Public License version 2.
  */
 
-#ifndef _INCLUDE__DRIVERS__BOARD__PBXA9_H_
-#define _INCLUDE__DRIVERS__BOARD__PBXA9_H_
+#ifndef _INCLUDE__DRIVERS__BOARD_H_
+#define _INCLUDE__DRIVERS__BOARD_H_
 
 namespace Genode
 {
 	/**
 	 * Driver for the Realview PBXA9 board
 	 */
-	struct Pbxa9
+	struct Board
 	{
 		enum
 		{
@@ -74,5 +74,5 @@ namespace Genode
 	};
 }
 
-#endif /* _INCLUDE__DRIVERS__BOARD__PBXA9_H_ */
+#endif /* _INCLUDE__DRIVERS__BOARD_H_ */
 
