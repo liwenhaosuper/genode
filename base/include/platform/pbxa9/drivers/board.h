@@ -70,6 +70,10 @@ namespace Genode
 			SP804_3_MMIO_SIZE = 4*1024,
 			SP804_3_IRQ       = 74,
 			SP804_3_CLOCK     = 1*1000*1000,
+
+			/* LCD controller */
+			PL11X_MMIO_BASE   = NORTHBRIDGE_AHB_BASE,
+			PL11X_MMIO_SIZE   = 0x1000,
 		};
 	};
 }

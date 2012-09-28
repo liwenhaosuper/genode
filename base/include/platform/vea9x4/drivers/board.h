@@ -37,6 +37,10 @@ namespace Genode
 			PL011_0_CLOCK = 24*1000*1000,
 			PL011_0_IRQ = 5,
 
+			/* LCD controller */
+			PL11X_MMIO_BASE  = SMB_CS7_BASE + 0x1f000,
+			PL11X_MMIO_SIZE  = 0x1000,
+
 			/* timer/counter */
 			SP804_0_1_MMIO_BASE = SMB_CS7_BASE + 0x11000,
 			SP804_0_1_MMIO_SIZE = 0x1000,
