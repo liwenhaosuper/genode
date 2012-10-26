@@ -185,6 +185,7 @@ namespace Arm_v7
 		 */
 		static void init_phys_kernel()
 		{
+			::Board::prepare_kernel();
 			Psr::write(Psr::init_kernel());
 			flush_tlb();
 		}
@@ -194,7 +195,7 @@ namespace Arm_v7
 		 */
 		static bool secure_mode()
 		{
-			if (!Board::SECURITY_EXTENSION) return 0;
+			if (!::Board::SECURITY_EXTENSION) return 0;
 			return !Cpu::Scr::Ns::get(Cpu::Scr::read());
 		}
 
