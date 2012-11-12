@@ -22,12 +22,10 @@ namespace Genode {
 
 	struct Thread_state : public Cpu_state
 	{
-		bool transfer;
 		bool is_vcpu;
 		addr_t sel_exc_base;
 
-		Thread_state(bool trans = false) : Cpu_state(), transfer(trans),
-		                                   is_vcpu(false), sel_exc_base(~0UL) {}
+		Thread_state() : Cpu_state(), is_vcpu(false), sel_exc_base(~0UL) { }
 	};
 }
 
