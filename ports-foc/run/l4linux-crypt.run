@@ -1,0 +1,115 @@
+assert_spec foc
+assert_spec x86_32
+
+#
+# Build
+#
+set build_components {
+	core
+	init
+	drivers/timer
+	drivers/atapi
+	drivers/framebuffer
+	drivers/nic
+	drivers/pci
+	drivers/input/ps2
+ 	l4linux
+}
+
+build $build_components
+create_boot_directory
+
+#
+# Config
+#
+set config  {
+<config prio_levels="2">
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="RAM"/>
+		<service name="IRQ"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="CAP"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+		<service name="SIGNAL"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+	<start name="atapi_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Block"/></provides>
+		<config ata="yes"/>
+	</start>
+	<start name="pci_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="PCI"/></provides>
+	</start>
+	<start name="vesa_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Framebuffer"/></provides>
+	</start>
+	<start name="ps2_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Input"/></provides>
+	</start>
+	<start name="nic_drv">
+		<resource name="RAM" quantum="2M"/>
+		<provides><service name="Nic"/></provides>
+	</start>
+	<start name="l4linux">
+		<resource name="RAM" quantum="128M"/>
+		<config args="mem=64M l4x_rd=initrd.gz l4x_cpus=2 l4x_cpus_map=0,1">
+			<block label="sda"/>
+		</config>
+	</start>
+</config>}
+
+install_config $config
+
+#
+# Boot modules
+#
+set boot_modules {
+	core
+	init
+	timer
+	atapi_drv
+	pci_drv
+	ps2_drv
+	vesa_drv
+	nic_drv
+	l4linux
+	initrd.gz
+}
+
+if {![file exists bin/initrd.gz]} {
+	puts "Download initramfs ..."
+	exec >& /dev/null wget -c -O bin/initrd.gz https://github.com/downloads/skalk/genode/shomich-initrd-20121206.gz
+}
+
+if {![file exists ata.raw]} {
+   puts "Create block device file ..."
+   exec >& /dev/null dd if=/dev/zero of=ata.raw bs=1024 count=0 seek=1048576
+}
+
+build_boot_image  [join $boot_modules " "]
+
+#
+# Qemu
+#
+append qemu_args " -m 128 -hda ata.raw -serial mon:stdio -smp 2,cores=2 -boot d "
+append qemu_args " -net nic,model=e1000 -net user "
+
+#
+# Execute test case
+#
+run_genode_until forever
