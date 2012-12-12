@@ -596,7 +596,8 @@ namespace Arm
 						w = Dfsr::Wnr::get(dfsr);
 						va = Dfar::read();
 						return 1;
-					}
+					} else
+						va = Dfar::read();
 					return 0; }
 
 				default: return 0;

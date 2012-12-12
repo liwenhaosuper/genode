@@ -31,6 +31,7 @@
 #include <platform_thread.h>
 #include <tlb.h>
 #include <trustzone.h>
+#include <csu.h>
 
 using namespace Kernel;
 
@@ -769,8 +770,8 @@ namespace Kernel
 
 				/* IRQ not owned by core, thus notify IRQ owner */
 				Irq_owner * const o = Irq_owner::owner(irq);
-				assert(o);
-				o->receive_irq(irq);
+				if(o)
+					o->receive_irq(irq);
 				break; }
 			}
 		}
@@ -1344,6 +1345,8 @@ extern "C" void kernel()
 
 		/* TrustZone initialization code */
 		trustzone_initialization(pic());
+
+		Genode::Csu csu(0x63f9c000);
 
 		/* switch to core address space */
 		Cpu::init_virt_kernel(core()->tlb()->base(), core_id());
