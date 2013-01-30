@@ -5,14 +5,26 @@
 #
 
 if {![have_spec trustzone]} {
-	puts "\nThe VMM support base-hw for Versatile Express with TrustZone support only\n"
+	puts "\nThe VMM currently supports TrustZone only\n"
 	exit 0
 }
 
-build "core init server/vmm"
+set build_components {
+	  core
+	  init
+	  drivers/framebuffer
+	  drivers/timer
+	  drivers/input
+	  server/nitpicker
+	  test/nitpicker
+	  server/vmm
+}
+lappend_if [have_spec imx53] build_components drivers/gpio
+
+build $build_components
 create_boot_directory
 
-install_config {
+set config {
 <config verbose="yes">
 	<parent-provides>
 		<service name="ROM"/>
@@ -30,10 +42,68 @@ install_config {
 	<default-route>
 		<any-service><any-child/><parent/></any-service>
 	</default-route>
+}
+
+append_if [have_spec pl11x] config {
+	<start name="pl11x_drv">
+		<resource name="RAM" quantum="2M"/>
+		<provides><service name="Framebuffer"/></provides>
+	</start>}
+
+append_if [have_spec ps2] config {
+	<start name="ps2_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Input"/></provides>
+	</start>}
+
+append_if [have_spec imx53] config {
+	<start name="imx53_gpio_drv">
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="Gpio"/></provides>
+		<config/>
+	</start>
+	<start name="imx53_fb_drv">
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="Framebuffer"/></provides>
+	</start>
+	<start name="dummy_input_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Input"/></provides>
+	</start>}
+
+append config {
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+	<start name="nitpicker">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Nitpicker"/></provides>
+	</start>
+	<start name="testnit">
+		<resource name="RAM" quantum="4M"/>
+	</start>
 	<start name="vmm">
 		<resource name="RAM" quantum="4M"/>
 	</start>
-</config>
-}
+</config>}
 
-build_boot_image "core init vmm linux initrd.gz"
+install_config $config
+
+set boot_modules {
+	core
+	init
+	timer
+	nitpicker
+	testnit
+	vmm
+	linux
+	initrd.gz
+}
+lappend_if [have_spec imx53] boot_modules imx53_gpio_drv
+lappend_if [have_spec imx53] boot_modules imx53_fb_drv
+lappend_if [have_spec imx53] boot_modules dummy_input_drv
+lappend_if [have_spec pl11x] boot_modules pl11x_drv
+lappend_if [have_spec ps2]   boot_modules ps2_drv
+
+build_boot_image  $boot_modules

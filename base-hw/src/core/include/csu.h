@@ -101,7 +101,7 @@ namespace Genode
 
 			Csu(addr_t const base) : Mmio(base)
 			{
-				/* Power TODO */
+				/* Power (CCM, SRC, DPLLIP1-4, GPC and OWIRE) */
 				write<Csl09::Slave_a>(Csl00::UNSECURE);
 
 				/* AHBMAX S0-S2 */
@@ -166,39 +166,55 @@ namespace Genode
 				/* SPDIF */
 				write<Csl29::Slave_a>(Csl00::UNSECURE);
 
-				//write<Csl02::Slave_b>(Csl00::UNSECURE);
-				//write<Csl03::Slave_a>(Csl00::UNSECURE);
-				//write<Csl03::Slave_b>(Csl00::UNSECURE);
-				//write<Csl04::Slave_b>(Csl00::UNSECURE); // SRTC
-				//write<Csl05::Slave_b>(Csl00::UNSECURE);
-				//write<Csl06::Slave_a>(Csl00::UNSECURE);
-				//write<Csl08::Slave_b>(Csl00::UNSECURE);
-				//write<Csl10::Slave_b>(Csl00::UNSECURE);
-				//write<Csl11::Slave_a>(Csl00::UNSECURE);
-				//write<Csl11::Slave_b>(Csl00::UNSECURE);
-				//write<Csl12::Slave_a>(Csl00::UNSECURE);
-				//write<Csl12::Slave_b>(Csl00::UNSECURE);
-				//write<Csl13::Slave_a>(Csl00::UNSECURE);
-				//write<Csl13::Slave_b>(Csl00::UNSECURE);
-				//write<Csl14::Slave_a>(Csl00::UNSECURE);
-				//write<Csl14::Slave_b>(Csl00::UNSECURE);
-				//write<Csl15::Slave_b>(Csl00::UNSECURE); // SCC
-				//write<Csl16::Slave_a>(Csl00::UNSECURE);
-				//write<Csl16::Slave_b>(Csl00::UNSECURE); // RTIC
-				//write<Csl17::Slave_a>(Csl00::UNSECURE);
-				//write<Csl19::Slave_b>(Csl00::UNSECURE);
-				//write<Csl20::Slave_b>(Csl00::UNSECURE);
-				//write<Csl21::Slave_a>(Csl00::UNSECURE);
-				//write<Csl21::Slave_b>(Csl00::UNSECURE);
-				//write<Csl23::Slave_a>(Csl00::UNSECURE);
-				//write<Csl23::Slave_b>(Csl00::UNSECURE);
-				//write<Csl24::Slave_b>(Csl00::UNSECURE);
-				//write<Csl26::Slave_b>(Csl00::UNSECURE);
-				//write<Csl27::Slave_a>(Csl00::UNSECURE);
-				//write<Csl27::Slave_b>(Csl00::UNSECURE);
-				//write<Csl29::Slave_b>(Csl00::UNSECURE);
-				//write<Csl30::Slave_a>(Csl00::UNSECURE);
-				//write<Csl31::Slave_b>(Csl00::UNSECURE);
+				/* GPU 2D */
+				write<Csl24::Slave_b>(Csl00::UNSECURE);
+
+				/* GPU 3D */
+				write<Csl27::Slave_b>(Csl00::UNSECURE);
+
+				write<Csl02::Slave_b>(Csl00::UNSECURE);
+				write<Csl03::Slave_a>(Csl00::UNSECURE);
+				write<Csl03::Slave_b>(Csl00::UNSECURE);
+				write<Csl04::Slave_b>(Csl00::UNSECURE); // SRTC
+				write<Csl05::Slave_b>(Csl00::UNSECURE);
+				write<Csl06::Slave_a>(Csl00::UNSECURE);
+				write<Csl08::Slave_b>(Csl00::UNSECURE);
+				write<Csl10::Slave_b>(Csl00::UNSECURE);
+				write<Csl11::Slave_a>(Csl00::UNSECURE);
+				write<Csl11::Slave_b>(Csl00::UNSECURE);
+				write<Csl12::Slave_a>(Csl00::UNSECURE);
+				write<Csl12::Slave_b>(Csl00::UNSECURE);
+				write<Csl13::Slave_a>(Csl00::UNSECURE);
+				write<Csl13::Slave_b>(Csl00::UNSECURE);
+				write<Csl14::Slave_a>(Csl00::UNSECURE);
+				write<Csl14::Slave_b>(Csl00::UNSECURE);
+				write<Csl15::Slave_b>(Csl00::UNSECURE); // SCC
+				write<Csl16::Slave_a>(Csl00::UNSECURE);
+				write<Csl16::Slave_b>(Csl00::UNSECURE); // RTIC
+				write<Csl17::Slave_a>(Csl00::UNSECURE);
+				write<Csl19::Slave_b>(Csl00::UNSECURE);
+				write<Csl20::Slave_b>(Csl00::UNSECURE);
+				write<Csl21::Slave_a>(Csl00::UNSECURE);
+				write<Csl21::Slave_b>(Csl00::UNSECURE);
+				write<Csl23::Slave_a>(Csl00::UNSECURE);
+				write<Csl23::Slave_b>(Csl00::UNSECURE);
+				write<Csl26::Slave_b>(Csl00::UNSECURE);
+				write<Csl27::Slave_a>(Csl00::UNSECURE);
+				write<Csl29::Slave_b>(Csl00::UNSECURE);
+				write<Csl30::Slave_a>(Csl00::UNSECURE);
+				write<Csl31::Slave_b>(Csl00::UNSECURE);
+
+				write<Master::Sdma>(Master::UNSECURE_UNLOCKED);
+				write<Master::Esdhc3>(Master::UNSECURE_UNLOCKED);
+				write<Master::Gpu>(Master::UNSECURE_UNLOCKED);
+				write<Master::Usb>(Master::UNSECURE_UNLOCKED);
+				write<Master::Pata>(Master::UNSECURE_UNLOCKED);
+				write<Master::Esdhc4>(Master::UNSECURE_UNLOCKED);
+				write<Master::Fec>(Master::UNSECURE_UNLOCKED);
+				write<Master::Dap>(Master::UNSECURE_UNLOCKED);
+				write<Master::Esdhc1>(Master::UNSECURE_UNLOCKED);
+				write<Master::Esdhc2>(Master::UNSECURE_UNLOCKED);
+
 			}
 	};
 

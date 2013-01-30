@@ -655,8 +655,13 @@ namespace Kernel
 	{
 		private:
 
-			Genode::Cpu_state_modes * const _state;
-			Signal_context * const          _context;
+			struct Vm_state : Genode::Cpu_state_modes
+			{
+				Genode::addr_t dfar;
+			};
+
+			Vm_state       * const _state;
+			Signal_context * const _context;
 
 		public:
 
@@ -665,9 +670,9 @@ namespace Kernel
 			/**
 			 * Constructor
 			 */
-			Vm(Genode::Cpu_state_modes * const state,
+			Vm(void           * const state,
 			   Signal_context * const context)
-			: _state(state), _context(context) { }
+			: _state((Vm_state * const)state), _context(context) { }
 
 			void run() {
 				cpu_scheduler()->insert(this); }
@@ -684,6 +689,8 @@ namespace Kernel
 				case Genode::Cpu_state::FAST_INTERRUPT_REQUEST:
 					handle_interrupt();
 					return;
+				case Genode::Cpu_state::DATA_ABORT:
+					_state->dfar = Cpu::Dfar::read();
 				default:
 					cpu_scheduler()->remove(this);
 					_context->trigger_signal(1);
@@ -1222,8 +1229,7 @@ namespace Kernel
 
 		/* dispatch arguments */
 		void * const allocator = (void * const)user->user_arg_1();
-		Genode::Cpu_state_modes * const state =
-			(Genode::Cpu_state_modes * const)user->user_arg_2();
+		void * const state     = (void * const)user->user_arg_2();
 		Signal_context * const context =
 			Signal_context::pool()->object(user->user_arg_3());
 		assert(context);

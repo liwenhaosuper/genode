@@ -65,7 +65,7 @@ Native_region * Platform::_mmio_regions(unsigned const i)
 		{ 0x07000000, 0x1000000  }, /* security controller */
 		{ 0x10000000, 0x30000000 }, /* SATA, IPU, GPU      */
 		{ 0x50000000, 0x20000000 }, /* Misc.               */
-		{ 0x80000000, 0x30000000 }, /* Unsecure RAM        */
+		{ 0x80000000, 0x70000000 }, /* Unsecure RAM        */
 	};
 	return i < sizeof(_regions)/sizeof(_regions[0]) ? &_regions[i] : 0;
 }

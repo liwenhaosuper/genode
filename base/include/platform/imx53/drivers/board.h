@@ -26,7 +26,7 @@ namespace Genode
 			MMIO_SIZE          = 0x70000000,
 
 			CSD0_DDR_RAM_BASE  = 0x70000000,
-			CSD0_DDR_RAM_SIZE  = 0x40000000,
+			CSD0_DDR_RAM_SIZE  = 0x80000000,
 
 			UART_1_IRQ         = 31,
 			UART_1_MMIO_BASE   = 0x53fbc000,

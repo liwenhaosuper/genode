@@ -40,7 +40,7 @@ namespace Kernel
 				for (unsigned i = 0; i <= MAX_INTERRUPT_ID; i++) {
 
 					/* configure interrupt's security level */
-					if ((i == ::Board::EPIT_1_IRQ) | (i == 27)) {
+					if ((i == ::Board::EPIT_1_IRQ) | (i == Board::EPIT_2_IRQ)) {
 						write<Intsec::Nonsecure>(0, i);
 
 						/* set highest priority */
