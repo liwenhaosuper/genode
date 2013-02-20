@@ -138,7 +138,7 @@ namespace Genode
 				write<Csl00::Slave_a>(Csl00::UNSECURE);
 
 				/* TVE */
-				write<Csl22::Slave_b>(Csl00::UNSECURE);
+				//write<Csl22::Slave_b>(Csl00::UNSECURE);
 
 				/* I2C */
 				write<Csl18::Slave_a>(Csl00::UNSECURE);
@@ -146,7 +146,7 @@ namespace Genode
 				write<Csl31::Slave_a>(Csl00::UNSECURE);
 
 				/* IPU */
-				write<Csl24::Slave_a>(Csl00::UNSECURE);
+				//write<Csl24::Slave_a>(Csl00::UNSECURE);
 
 				/* Audio */
 				write<Csl18::Slave_b>(Csl00::UNSECURE);
@@ -196,7 +196,7 @@ namespace Genode
 				write<Csl20::Slave_b>(Csl00::UNSECURE);
 				write<Csl21::Slave_a>(Csl00::UNSECURE);
 				write<Csl21::Slave_b>(Csl00::UNSECURE);
-				write<Csl23::Slave_a>(Csl00::UNSECURE);
+				//write<Csl23::Slave_a>(Csl00::UNSECURE); //VPU
 				write<Csl23::Slave_b>(Csl00::UNSECURE);
 				write<Csl26::Slave_b>(Csl00::UNSECURE);
 				write<Csl27::Slave_a>(Csl00::UNSECURE);

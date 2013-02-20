@@ -22,6 +22,10 @@
 #include <rom_session/connection.h>
 #include <vm_session/connection.h>
 #include <dataspace/client.h>
+#include <nitpicker_view/client.h>
+#include <nitpicker_session/connection.h>
+#include <framebuffer_session/client.h>
+#include <blit/blit.h>
 
 /* local includes */
 #include <atag.h>
@@ -39,13 +43,21 @@ namespace Genode {
 
 		public:
 
+			class Invalid_addr : Exception {};
+
 			Ram(addr_t addr, size_t sz, addr_t local)
 			: _base(addr), _size(sz), _local(local) { }
 
 			addr_t base()          { return _base;  }
 			size_t size()          { return _size;  }
 			addr_t local()         { return _local; }
-			addr_t va(addr_t phys) { return _local + (phys - _base); }
+
+			addr_t va(addr_t phys)
+			{
+				if ((phys < _base) || (phys > (_base + _size)))
+					throw Invalid_addr();
+				return _local + (phys - _base);
+			}
 	};
 
 
@@ -256,6 +268,8 @@ namespace Genode {
 				      "data_abort", "irq", "fiq" };
 
 				printf("Cpu state:\n");
+				printf("  Register     Virt     Phys\n");
+				printf("---------------------------------\n");
 				printf("  r0         = %08lx [%08lx]\n",
 				       _state->r0, va_to_pa(_state->r0));
 				printf("  r1         = %08lx [%08lx]\n",
@@ -291,12 +305,12 @@ namespace Genode {
 				printf("  cpsr       = %08lx\n", _state->cpsr);
 				for (unsigned i = 0;
 				     i < Vm_state::Mode_state::MAX; i++) {
-					printf("  sp_%s     = %08lx\n", modes[i],
-					       va_to_pa(_state->mode[i].sp));
-					printf("  lr_%s     = %08lx\n", modes[i],
-					       va_to_pa(_state->mode[i].lr));
-					printf("  spsr_%s   = %08lx\n", modes[i],
-					       va_to_pa(_state->mode[i].spsr));
+					printf("  sp_%s     = %08lx [%08lx]\n", modes[i],
+					       _state->mode[i].sp, va_to_pa(_state->mode[i].sp));
+					printf("  lr_%s     = %08lx [%08lx]\n", modes[i],
+					       _state->mode[i].lr, va_to_pa(_state->mode[i].lr));
+					printf("  spsr_%s   = %08lx [%08lx]\n", modes[i],
+					       _state->mode[i].spsr, va_to_pa(_state->mode[i].spsr));
 				}
 				printf("  ttbr0      = %08lx\n", _state->ttbr[0]);
 				printf("  ttbr1      = %08lx\n", _state->ttbr[1]);
@@ -308,11 +322,76 @@ namespace Genode {
 
 			addr_t va_to_pa(addr_t va)
 			{
-				Mmu mmu(_state, &_ram);
-				return mmu.phys_addr(va);
+				try {
+					Mmu mmu(_state, &_ram);
+					return mmu.phys_addr(va);
+				} catch(Ram::Invalid_addr) {}
+				return 0;
 			}
 
 			Vm_state *state() const { return  _state; }
+			Ram      *ram()         { return &_ram;   }
+	};
+
+
+	class Framebuffer
+	{
+		private:
+
+			Vm                           *_vm;
+			Nitpicker::Connection         _nitpicker;
+			Nitpicker::View_client        _view;
+			::Framebuffer::Session_client _fb;
+			addr_t                        _dst;
+
+			enum Opcodes {
+				SIZE,
+				BASE,
+				INFO,
+				REFRESH,
+			};
+
+			enum {
+				WIDTH   = 640,
+				HEIGHT  = 480,
+				X_POS   = 10,
+				Y_POS   = 20,
+				BPP     = 2
+			};
+
+		public:
+
+			Framebuffer(Vm *vm)
+			: _vm(vm),
+			  _nitpicker(WIDTH, HEIGHT),
+			  _view(_nitpicker.create_view()),
+			  _fb(_nitpicker.framebuffer_session()),
+			  _dst((addr_t)env()->rm_session()->attach(_fb.dataspace()))
+			{
+				_view.viewport(X_POS, Y_POS, WIDTH, HEIGHT, 0, 0, false);
+				_view.stack(Nitpicker::View_capability(), true, true);
+				memset((void*)_dst, 0, WIDTH*HEIGHT*BPP);
+			}
+
+			void handle(Vm_state *state)
+			{
+				switch (state->r1) {
+				case REFRESH:
+					{
+						addr_t src   = _vm->ram()->va(state->r6);
+						size_t src_x = (state->r4)*BPP;
+						src += src_x*state->r3 + state->r2*BPP;
+						addr_t dst = _dst + WIDTH*BPP*state->r3 + state->r2*BPP;
+						blit((void*)src, src_x, (void*)dst, WIDTH*BPP,
+							 min<int>(WIDTH,state->r4)*BPP, min<int>(HEIGHT,state->r5));
+						_fb.refresh(state->r2, state->r3, state->r4, state->r5);
+						break;
+					}
+				default:
+					PWRN("Unknown opcode!");
+					_vm->dump();
+				};
+			}
 	};
 
 
@@ -320,14 +399,23 @@ namespace Genode {
 	{
 		private:
 
+			enum Devices { FRAMEBUFFER };
+
 			Vm                   *_vm;
 			Io_mem_connection     _m4if_io_mem;
 			M4if                  _m4if;
+			Framebuffer           _fb;
 
 			void _handle_hypervisor_call()
 			{
-				PERR("Unknown hypervisor call!");
-				_vm->dump();
+				switch (_vm->state()->r0) {
+				case FRAMEBUFFER:
+					_fb.handle(_vm->state());
+					break;
+				default:
+					PERR("Unknown hypervisor call!");
+					_vm->dump();
+				};
 			}
 
 			bool _handle_data_abort()
@@ -386,8 +474,11 @@ namespace Genode {
 			    addr_t m4if_base)
 			: _vm(vm),
 			  _m4if_io_mem(m4if_base, 0x1000),
-			  _m4if((addr_t)env()->rm_session()->attach(_m4if_io_mem.dataspace())) {
-				_m4if.set_region(0x70000000, 0xfffffff); }
+			  _m4if((addr_t)env()->rm_session()->attach(_m4if_io_mem.dataspace())),
+			  _fb(vm)
+			{
+				_m4if.set_region(0x70000000, 0xfffffff);
+			}
 	};
 }
 
@@ -400,7 +491,7 @@ int main()
 		M4IF_PHYS_BASE = 0x63fd8000,
 	};
 
-	static const char* cmdline = "console=ttymxc0,115200 di0_primary calibration init=/init androidboot.console=ttymxc0";
+	static const char* cmdline = "console=ttymxc0,115200 init=/init androidboot.console=ttymxc0 di1_primary debug video=mxcdi1fb:VGA";
 	static Genode::Vm  vm("linux", "initrd.gz", cmdline,
 	                      MAIN_MEM_START, MAIN_MEM_SIZE);
 	static Genode::Vmm vmm(&vm, M4IF_PHYS_BASE);
