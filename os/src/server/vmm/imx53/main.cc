@@ -22,9 +22,7 @@
 #include <rom_session/connection.h>
 #include <vm_session/connection.h>
 #include <dataspace/client.h>
-#include <nitpicker_view/client.h>
-#include <nitpicker_session/connection.h>
-#include <framebuffer_session/client.h>
+#include <imx_framebuffer_session/connection.h>
 #include <blit/blit.h>
 
 /* local includes */
@@ -338,53 +336,26 @@ namespace Genode {
 	{
 		private:
 
-			Vm                           *_vm;
-			Nitpicker::Connection         _nitpicker;
-			Nitpicker::View_client        _view;
-			::Framebuffer::Session_client _fb;
-			addr_t                        _dst;
+			Vm                            *_vm;
+			::Framebuffer::Imx_connection  _overlay;
+			addr_t                         _base;
 
 			enum Opcodes {
-				SIZE,
 				BASE,
-				INFO,
-				REFRESH,
-			};
-
-			enum {
-				WIDTH   = 640,
-				HEIGHT  = 480,
-				X_POS   = 10,
-				Y_POS   = 20,
-				BPP     = 2
 			};
 
 		public:
 
 			Framebuffer(Vm *vm)
-			: _vm(vm),
-			  _nitpicker(WIDTH, HEIGHT),
-			  _view(_nitpicker.create_view()),
-			  _fb(_nitpicker.framebuffer_session()),
-			  _dst((addr_t)env()->rm_session()->attach(_fb.dataspace()))
-			{
-				_view.viewport(X_POS, Y_POS, WIDTH, HEIGHT, 0, 0, false);
-				_view.stack(Nitpicker::View_capability(), true, true);
-				memset((void*)_dst, 0, WIDTH*HEIGHT*BPP);
-			}
+			: _vm(vm), _base(0) { }
 
 			void handle(Vm_state *state)
 			{
 				switch (state->r1) {
-				case REFRESH:
+				case BASE:
 					{
-						addr_t src   = _vm->ram()->va(state->r6);
-						size_t src_x = (state->r4)*BPP;
-						src += src_x*state->r3 + state->r2*BPP;
-						addr_t dst = _dst + WIDTH*BPP*state->r3 + state->r2*BPP;
-						blit((void*)src, src_x, (void*)dst, WIDTH*BPP,
-							 min<int>(WIDTH,state->r4)*BPP, min<int>(HEIGHT,state->r5));
-						_fb.refresh(state->r2, state->r3, state->r4, state->r5);
+						_base = state->r2;
+						_overlay.overlay(_base);
 						break;
 					}
 				default:
@@ -491,7 +462,7 @@ int main()
 		M4IF_PHYS_BASE = 0x63fd8000,
 	};
 
-	static const char* cmdline = "console=ttymxc0,115200 init=/init androidboot.console=ttymxc0 di1_primary debug video=mxcdi1fb:VGA";
+	static const char* cmdline = "console=ttymxc0,115200 init=/init androidboot.console=ttymxc0 di1_primary debug video=mxcdi1fb:SEIKO-WVGA";
 	static Genode::Vm  vm("linux", "initrd.gz", cmdline,
 	                      MAIN_MEM_START, MAIN_MEM_SIZE);
 	static Genode::Vmm vmm(&vm, M4IF_PHYS_BASE);

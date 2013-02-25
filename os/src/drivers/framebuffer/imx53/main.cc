@@ -5,7 +5,7 @@
  */
 
 /* Genode includes */
-#include <framebuffer_session/framebuffer_session.h>
+#include <imx_framebuffer_session/imx_framebuffer_session.h>
 #include <cap_session/connection.h>
 #include <dataspace/client.h>
 #include <base/printf.h>
@@ -22,40 +22,28 @@ namespace Framebuffer {
 
 
 class Framebuffer::Session_component :
-	public Genode::Rpc_object<Framebuffer::Session>
+	public Genode::Rpc_object<Framebuffer::Imx_session>
 {
 	private:
 
-		size_t               _size;
-		Dataspace_capability _ds;
-		addr_t               _phys_base;
-
+		Driver              &_driver;
 
 	public:
 
-		Session_component(Driver &driver)
-		: _size(Driver::FRAMEBUFFER_SIZE),
-		  _ds(env()->ram_session()->alloc(_size, false)),
-		  _phys_base(Dataspace_client(_ds).phys_addr())
-		{
-			if (!driver.init(_phys_base)) {
-				PERR("Could not initialize display");
-				struct Could_not_initialize_display : Exception { };
-				throw Could_not_initialize_display();
-			}
-		}
+		Session_component(Driver &driver) : _driver(driver) { }
 
 
 		/**************************************
 		 **  Framebuffer::session interface  **
 		 **************************************/
 
-		Dataspace_capability dataspace() { return _ds; }
+		Dataspace_capability dataspace() { return _driver.dataspace(); }
 		void release() { }
 		Mode mode() const {
 			return Mode(Driver::WIDTH, Driver::HEIGHT, Mode::RGB565); }
 		void mode_sigh(Genode::Signal_context_capability) { }
 		void refresh(int, int, int, int) { }
+		void overlay(addr_t phys_base) { _driver.overlay(phys_base); }
 };
 
 int main(int, char **)
@@ -70,8 +58,8 @@ int main(int, char **)
 	static Cap_connection cap;
 	static Rpc_entrypoint ep(&cap, STACK_SIZE, "fb_ep");
 
-	static Session_component                 fb_session(driver);
-	static Static_root<Framebuffer::Session> fb_root(ep.manage(&fb_session));
+	static Session_component fb_session(driver);
+	static Static_root<Framebuffer::Imx_session> fb_root(ep.manage(&fb_session));
 
 	env()->parent()->announce(ep.manage(&fb_root));
 

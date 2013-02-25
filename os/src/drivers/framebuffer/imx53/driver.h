@@ -27,6 +27,10 @@ class Framebuffer::Driver
 {
 	private:
 
+		size_t               _size;
+		Dataspace_capability _ds;
+		addr_t               _phys_base;
+
 		/* Clocks control module */
 		Attached_io_mem_dataspace _ccm_mmio;
 		Ccm                       _ccm;
@@ -64,27 +68,29 @@ class Framebuffer::Driver
 
 
 		Driver()
-		: _ccm_mmio(Board::CCM_BASE, Board::CCM_SIZE),
+		: _ds(env()->ram_session()->alloc(FRAMEBUFFER_SIZE, false)),
+		  _phys_base(Dataspace_client(_ds).phys_addr()),
+		  _ccm_mmio(Board::CCM_BASE, Board::CCM_SIZE),
 		  _ccm((addr_t)_ccm_mmio.local_addr<void>()),
 		  _src_mmio(Board::SRC_BASE, Board::SRC_SIZE),
 		  _src((addr_t)_src_mmio.local_addr<void>()),
 		  _ipu_mmio(Board::IPU_BASE, Board::IPU_SIZE),
-		  _ipu((addr_t)_ipu_mmio.local_addr<void>()) { }
-
-		bool init(addr_t phys_base)
+		  _ipu((addr_t)_ipu_mmio.local_addr<void>())
 		{
 			/* reset ipu over src */
 			_src.write<Src::Ctrl_reg::Ipu_rst>(1);
 
 			_ccm.ipu_clk_enable();
 
-			_ipu.init(WIDTH, HEIGHT, WIDTH * BYTES_PER_PIXEL, phys_base);
+			_ipu.init(WIDTH, HEIGHT, WIDTH * BYTES_PER_PIXEL, _phys_base);
 
 			/* Turn on lcd power */
 			_gpio.direction_output(LCD_BL_GPIO, true);
 			_gpio.direction_output(LCD_CONT_GPIO, true);
-			return true;
 		}
 
+		Dataspace_capability dataspace() { return _ds; }
+
+		void overlay(addr_t phys_base) { _ipu.overlay_base(phys_base); }
 };
 
