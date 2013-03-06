@@ -50,7 +50,7 @@ Vm_session_component::Vm_session_component(Rpc_entrypoint  *ds_ep,
 : _ds_ep(ds_ep), _ram_alloc(ram_alloc), _vm_id(0),
   _ds_addr(_alloc_ds(&ram_quota)),
   _ds(_ds_size(), _ds_addr, _ds_addr, false, true, 0),
-  _ds_cap(static_cap_cast<Dataspace>(_ds_ep->manage(&_ds)))
+  _ds_cap(static_cap_cast<Io_mem_dataspace>(_ds_ep->manage(&_ds)))
 {
 	/* alloc needed memory */
 	if (Kernel::vm_size() > ram_quota ||

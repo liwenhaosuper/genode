@@ -20,12 +20,16 @@
 
 struct Src : Genode::Mmio
 {
-	Src(Genode::addr_t const mmio_base) : Genode::Mmio(mmio_base) { }
-
 	struct Ctrl_reg : Register<0x0, 32>
 	{
 		struct Ipu_rst : Bitfield<3, 1> { };
 	};
+
+	Src(Genode::addr_t const mmio_base) : Genode::Mmio(mmio_base)
+	{
+		/* reset ipu over src */
+		write<Src::Ctrl_reg::Ipu_rst>(1);
+	}
 };
 
 #endif /* _SRC_H_ */

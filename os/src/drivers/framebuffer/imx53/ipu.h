@@ -14,6 +14,8 @@
 #include <drivers/board.h>
 #include <os/attached_io_mem_dataspace.h>
 
+#include "iomuxc.h"
+#include "pwm.h"
 
 using namespace Genode;
 
@@ -31,10 +33,16 @@ struct Ipu : Genode::Mmio
 	{
 		struct Dp_m_srm : Bitfield<3,2> { enum { UPDATE_NOW = 1 }; };
 	};
-	struct Disp_gen        : Register<0xc4,  32> { };
-	struct Mem_rst         : Register<0xdc,  32> { };
-	struct Ch_db_mode_sel0 : Register<0x150, 32> { };
-	struct Cur_buf_0       : Register<0x23c, 32> { };
+	struct Disp_gen             : Register<0xc4,  32> { };
+	struct Mem_rst              : Register<0xdc,  32> { };
+	struct Pm                   : Register<0xe0,  32> { };
+	struct Gpr                  : Register<0xe4,  32> { };
+	struct Ch_db_mode_sel0      : Register<0x150, 32> { };
+	struct Alt_ch_trb_mode_sel0 : Register<0x178, 32> { };
+	struct Cur_buf_0            : Register<0x23c, 32> { };
+	struct Triple_cur_buf_1     : Register<0x25c, 32> { };
+	struct Ch_buf0_rdy0         : Register<0x268, 32> { };
+	struct Ch_buf1_rdy0         : Register<0x270, 32> { };
 
 
 	/**************************************
@@ -44,6 +52,7 @@ struct Ipu : Genode::Mmio
 	enum Idmac_channels {
 		CHAN_DP_PRIMARY_MAIN = 23,
 		CHAN_DP_PRIMARY_AUXI = 27,
+		CHAN_DC_SYNC_FLOW    = 28
 	};
 
 	struct Idmac_ch_en : Register_array<0x8004, 32, 32, 1>
@@ -51,7 +60,14 @@ struct Ipu : Genode::Mmio
 		struct Ch : Bitfield<0, 1> { };
 	};
 
-	struct Idmac_ch_pri_1  : Register<0x8014,   32> { };
+	struct Idmac_ch_pri_1  : Register<0x8014, 32> { };
+
+	struct Idmac_wm_en : Register_array<0x801c, 32, 32, 1>
+	{
+		struct Ch : Bitfield<0, 1> { };
+	};
+
+	struct Idmac_ch_lock_en_1 : Register<0x8024, 32> { };
 
 
 	/***********************************
@@ -99,13 +115,13 @@ struct Ipu : Genode::Mmio
 	 **  Display controller registers  **
 	 ************************************/
 
-	struct Dc_wr_ch_conf_1  : Register<0x5801c, 32> { };
 	struct Dc_wr_ch_conf_5  : Register<0x5805c, 32> { };
 	struct Dc_wr_ch_addr_5  : Register<0x58060, 32> { };
 	template <unsigned NR>
 	struct Dc_rl_ch_5       : Register<0x58064+(NR*4), 32> { };
 	struct Dc_gen           : Register<0x580d4, 32> { };
 	struct Dc_disp_conf2_0  : Register<0x580e8, 32> { };
+	struct Dc_disp_conf2_1  : Register<0x580ec, 32> { };
 	template <unsigned NR>
 	struct Dc_map_conf      : Register<0x58108+(NR*4), 32> { };
 	template <unsigned NR>
@@ -265,14 +281,132 @@ struct Ipu : Genode::Mmio
 		/* disable DMFC channel from image converter */
 		write<Dmfc_ic_ctrl>(0x2);
 
-		/* set DMFC NORMAL mode */
-		write<Dmfc_wr_chan>(0x90);
+		/* set DMFC FIFO for idma channels */
+		write<Dmfc_wr_chan>(0x90); /* channel CHAN_DC_SYNC_FLOW */
 		write<Dmfc_wr_chan_def>(0x202020f6);
-		write<Dmfc_dp_chan>(0x9694);
+		write<Dmfc_dp_chan>(0x968a); /* channels CHAN_DP_PRIMARY_XXX */
 		write<Dmfc_dp_chan_def>(0x2020f6f6);
+		write<Dmfc_general_1>(0x3);
 
-		/* set sync refresh channels and CSI->mem channel as high priority */
-		write<Idmac_ch_pri_1>(0x18800000);
+		/* set idma channels 23, 27, 28 as high priority */
+		write<Idmac_ch_pri_1>(1 << CHAN_DP_PRIMARY_MAIN |
+		                      1 << CHAN_DP_PRIMARY_AUXI |
+		                      1 << CHAN_DC_SYNC_FLOW);
+
+		/* generate 8 AXI bursts upon the assertion of DMA request for our channels */
+		write<Idmac_ch_lock_en_1>(0x3f0000);
+
+#if 1
+		write<Disp_gen>(0x600000); //write<Disp_gen>(0x2400000);
+
+		write<Dp_com_conf>(0);
+		write<Srm_pri2::Dp_m_srm>(Srm_pri2::Dp_m_srm::UPDATE_NOW);
+
+		write<Dc_rl_ch_5<0> >(0x2030000);
+		write<Dc_rl_ch_5<1> >(0);
+		write<Dc_rl_ch_5<2> >(0x302);
+		write<Dc_rl_ch_5<3> >(0);
+		write<Dc_rl_ch_5<4> >(0x401);
+		write<Dc_wr_ch_conf_5>(0xe);
+		write<Dc_wr_ch_addr_5>(0x0);
+		write<Dc_gen>(0x84);
+
+		write<Conf>(0);
+
+		write<Di1::General>(0x200000);
+		write<Di1::General>(0x300000);
+
+		write<Di1::Bs_clkgen0>(0x10);
+		write<Di1::Bs_clkgen1>(0x10000);
+
+		write<Pm>(0x10101010);
+
+		write<Di1::Dw_gen<0> >(0x300);
+		write<Di1::Dw_set3<0> >(0x20000);
+		write<Di1::Sync_wave_gen0<0> >(0x29f90000);
+		write<Di1::Sync_wave_gen1<0> >(0x10000000);
+		write<Di1::Step_repeat<0> >(0x0);
+		write<Di1::Sync_wave_gen0<1> >(0x29f90001);
+		write<Di1::Sync_wave_gen1<1> >(0x30781000);
+		write<Di1::Step_repeat<0> >(0x0);
+		write<Di1::Sync_wave_gen0<2> >(0x192a0000);
+		write<Di1::Sync_wave_gen1<2> >(0x30142000);
+		write<Di1::Step_repeat<1> >(0x3000000);
+		write<Di1::Scr_conf>(0x325);
+		write<Di1::Sync_wave_gen0<3> >(0x300fb);
+		write<Di1::Sync_wave_gen1<3> >(0x8000000);
+		write<Di1::Step_repeat<1> >(0x3000000);
+		write<Di1::Sync_wave_gen0<4> >(0x108c1);
+		write<Di1::Sync_wave_gen1<4> >(0xa000000);
+		write<Di1::Step_repeat<2> >(0x400);
+		write<Di1::Sync_wave_gen0<6> >(0x29f90091);
+		write<Di1::Sync_wave_gen1<6> >(0x30781000);
+		write<Di1::Step_repeat<3> >(0x0);
+		write<Di1::Sync_wave_gen0<7> >(0x192a000a);
+		write<Di1::Sync_wave_gen1<7> >(0x30142000);
+		write<Di1::Step_repeat<3> >(0x0);
+		write<Di1::Sync_wave_gen0<5> >(0x0);
+		write<Di1::Sync_wave_gen1<5> >(0x0);
+		write<Di1::Sync_wave_gen0<8> >(0x0);
+		write<Di1::Sync_wave_gen1<8> >(0x0);
+		write<Di1::Step_repeat<4> >(0x0);
+		write<Di1::Step_repeat<2> >(0x400);
+
+		write<Di1::Sync_wave_gen0<5> >(0x90011);
+		write<Di1::Sync_wave_gen1<5> >(0x4000000);
+		write<Di1::Step_repeat<2> >(0x28a0400);
+
+		write<Dc_template<4> >(0x10885);
+		write<Dc_template<5> >(0x380);
+		write<Dc_template<6> >(0x845);
+		write<Dc_template<7> >(0x280);
+		write<Dc_template<8> >(0x10805);
+		write<Dc_template<9> >(0x380);
+
+		write<Di1::General>(0x6300000);
+		write<Di1::Sync_as_gen>(0x4000);
+
+		write<Di1::Polarity>(0x10);
+		write<Dc_disp_conf2_1>(0x400);
+
+		init_dma_channel(CHAN_DP_PRIMARY_MAIN, width, height, stride, phys_base);
+		init_dma_channel(CHAN_DP_PRIMARY_AUXI, width, height, stride, phys_base);
+
+		/* use double buffer for main DMA channel */
+		write<Ch_db_mode_sel0>(1 << CHAN_DP_PRIMARY_MAIN |
+							   1 << CHAN_DP_PRIMARY_AUXI);
+
+		/* buffer used by DMA channel is buffer 1 */
+		write<Cur_buf_0>(1 << CHAN_DP_PRIMARY_MAIN);
+
+		write<Conf>(0x6a0);
+
+		/* Enable IDMAC channels */
+		write<Idmac_ch_en::Ch>(1, CHAN_DP_PRIMARY_MAIN);
+		write<Idmac_ch_en::Ch>(1, CHAN_DP_PRIMARY_AUXI);
+
+		write<Idmac_wm_en>(1 << CHAN_DP_PRIMARY_MAIN |
+						   1 << CHAN_DP_PRIMARY_AUXI);
+
+		write<Dc_wr_ch_conf_5>(0x8e);
+
+		write<Disp_gen>(0x2600000);
+
+
+		write<Dp_com_conf>(1 << 0);
+		write<Srm_pri2::Dp_m_srm>(Srm_pri2::Dp_m_srm::UPDATE_NOW);
+
+		write<Dp_fg_pos_sync>(16);
+		write<Srm_pri2::Dp_m_srm>(Srm_pri2::Dp_m_srm::UPDATE_NOW);
+
+		write<Dp_com_conf>(1 << 0 | 1 << 2);
+		write<Srm_pri2::Dp_m_srm>(Srm_pri2::Dp_m_srm::UPDATE_NOW);
+
+		write<Gr_wnd_ctl_sync>(0x00000000);
+		write<Srm_pri2::Dp_m_srm>(Srm_pri2::Dp_m_srm::UPDATE_NOW);
+
+#else
+		// TODO: enable IPU_IDMAC_LOCK_EN_1 bit 16-21
 
 		/* set MCU_T to divide MCU access window into 2 */
 		write<Disp_gen>(0x1600000); // ?= 0x600000
@@ -300,9 +434,9 @@ struct Ipu : Genode::Mmio
 		write<Dc_rl_ch_5<3> >(0x0);
 		write<Dc_rl_ch_5<3> >(0x0);
 
-		/* initialize display controller */
 		write<Dc_wr_ch_conf_5>(0x2);
 		write<Dc_wr_ch_addr_5>(0x0);
+
 		write<Dc_gen>(0x84);
 
 
@@ -359,6 +493,7 @@ struct Ipu : Genode::Mmio
 		write<Di0::Polarity>(0x10);
 		write<Dc_disp_conf2_0>(0x320);
 
+
 		/* init IDMAC channels */
 		init_dma_channel(CHAN_DP_PRIMARY_MAIN, width, height, stride, phys_base);
 		init_dma_channel(CHAN_DP_PRIMARY_AUXI, width, height, stride, phys_base);
@@ -376,12 +511,12 @@ struct Ipu : Genode::Mmio
 		/* buffer used by DMA channel is buffer 1 */
 		write<Cur_buf_0>(1 << CHAN_DP_PRIMARY_MAIN);
 
-		write<Dc_wr_ch_conf_1>(0x4);
 		write<Dc_wr_ch_conf_5>(0x82);
 
 		/* Enable IDMAC channels */
 		write<Idmac_ch_en::Ch>(1, CHAN_DP_PRIMARY_MAIN);
 		write<Idmac_ch_en::Ch>(1, CHAN_DP_PRIMARY_AUXI);
+#endif
 	}
 
 

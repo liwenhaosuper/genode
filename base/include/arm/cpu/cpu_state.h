@@ -42,13 +42,13 @@ namespace Genode {
 		/**
 		 * Registers
 		 */
-		addr_t r0, r1, r2, r3, r4, r5, r6,
+		volatile addr_t r0, r1, r2, r3, r4, r5, r6,
 		       r7, r8, r9, r10, r11, r12; /* general purpose register 0..12 */
-		addr_t sp;                        /* stack pointer */
-		addr_t lr;                        /* link register */
-		addr_t ip;                        /* instruction pointer */
-		addr_t cpsr;                      /* current program status register */
-		addr_t cpu_exception;             /* last hardware exception */
+		volatile addr_t sp;                        /* stack pointer */
+		volatile addr_t lr;                        /* link register */
+		volatile addr_t ip;                        /* instruction pointer */
+		volatile addr_t cpsr;                      /* current program status register */
+		volatile addr_t cpu_exception;             /* last hardware exception */
 	};
 
 	/**

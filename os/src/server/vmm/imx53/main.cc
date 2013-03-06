@@ -24,6 +24,10 @@
 #include <dataspace/client.h>
 #include <imx_framebuffer_session/connection.h>
 #include <blit/blit.h>
+#include <nitpicker_session/connection.h>
+#include <nitpicker_view/client.h>
+#include <input/event_queue.h>
+#include <input/event.h>
 
 /* local includes */
 #include <atag.h>
@@ -250,7 +254,8 @@ namespace Genode {
 				_load_initrd();
 				_prepare_atag();
 				_state->cpsr = 0x93; /* SVC mode and IRQs disabled */
-				_state->r1 = 3273;   /* MACH_TYPE mx53 loco board  */
+				//_state->r1 = 3273;   /* MACH_TYPE mx53 loco board  */
+				_state->r1 = 3011;   /* MACH_TYPE mx53 smd board  */
 				_state->r2 = _ram.base() + ATAG_OFFSET; /* ATAG addr */
 				_vm_con.exception_handler(sig_cap);
 			}
@@ -366,22 +371,113 @@ namespace Genode {
 	};
 
 
+	class Input
+	{
+		private:
+
+			Vm                        *_vm;
+			Nitpicker::Connection      _nitpicker;
+			Nitpicker::View_capability _view_cap;
+			::Input::Event            *_ev_buf;
+			unsigned                   _num_events;
+			unsigned                   _event;
+
+			enum Opcodes {
+				GET_EVENT,
+			};
+
+			enum Type {
+				INVALID,
+				PRESS,
+				RELEASE,
+				MOTION
+			};
+
+		public:
+
+			Input(Vm *vm)
+			: _vm(vm),
+			  _nitpicker(1024, 768, false),
+			  _view_cap(_nitpicker.create_view()),
+			  _ev_buf(env()->rm_session()->attach(_nitpicker.input()->dataspace())),
+			  _num_events(0),
+			  _event(0)
+			{
+				using namespace Nitpicker;
+
+				View_client(_view_cap).viewport(0, 0, 1024, 768, 0, 0, true);
+				View_client(_view_cap).stack(Nitpicker::View_capability(), true, true);
+				View_client(_view_cap).title("Android");
+			}
+
+			void handle(Vm_state * volatile state)
+			{
+				switch (state->r1) {
+				case GET_EVENT:
+					{
+						state->r0 = INVALID;
+
+						if (!_num_events && _nitpicker.input()->is_pending())
+							_num_events = _nitpicker.input()->flush();
+
+						if (_event < _num_events) {
+							::Input::Event *ev = &_ev_buf[_event];
+							switch (ev->type()) {
+							case ::Input::Event::PRESS:
+								state->r0 = PRESS;
+								state->r3 = ev->keycode();
+								break;
+							case ::Input::Event::RELEASE:
+								state->r0 = RELEASE;
+								state->r3 = ev->keycode();
+								break;
+							case ::Input::Event::MOTION:
+								state->r0 = MOTION;
+								break;
+							}
+							state->r1 = ev->ax();
+							state->r2 = ev->ay();
+							_event++;
+						}
+
+						if (_event == _num_events) {
+							_num_events = 0;
+							_event      = 0;
+						}
+
+						break;
+					}
+				default:
+					PWRN("Unknown opcode!");
+					_vm->dump();
+				};
+			}
+	};
+
+
 	class Vmm : public Genode::Thread<8192>
 	{
 		private:
 
-			enum Devices { FRAMEBUFFER };
+			enum Devices {
+				FRAMEBUFFER,
+				INPUT,
+			};
 
 			Vm                   *_vm;
 			Io_mem_connection     _m4if_io_mem;
 			M4if                  _m4if;
 			Framebuffer           _fb;
+			Input                 _input;
 
 			void _handle_hypervisor_call()
 			{
 				switch (_vm->state()->r0) {
 				case FRAMEBUFFER:
 					_fb.handle(_vm->state());
+					break;
+				case INPUT:
+					_input.handle(_vm->state());
 					break;
 				default:
 					PERR("Unknown hypervisor call!");
@@ -434,7 +530,7 @@ namespace Genode {
 						PWRN("Invalid context");
 						continue;
 					}
-					if (!_handle_vm())
+					if ((s.context() == &sig_cxt) && !_handle_vm())
 						return;
 				}
 			};
@@ -446,7 +542,8 @@ namespace Genode {
 			: _vm(vm),
 			  _m4if_io_mem(m4if_base, 0x1000),
 			  _m4if((addr_t)env()->rm_session()->attach(_m4if_io_mem.dataspace())),
-			  _fb(vm)
+			  _fb(vm),
+			  _input(vm)
 			{
 				_m4if.set_region(0x70000000, 0xfffffff);
 			}
@@ -462,7 +559,7 @@ int main()
 		M4IF_PHYS_BASE = 0x63fd8000,
 	};
 
-	static const char* cmdline = "console=ttymxc0,115200 init=/init androidboot.console=ttymxc0 di1_primary debug video=mxcdi1fb:SEIKO-WVGA";
+	static const char* cmdline = "console=ttymxc0,115200 androidboot.console=ttymxc0 lpj=4997120 video=mxcdi1fb:RGB666,XGA gpu_memory=64M";
 	static Genode::Vm  vm("linux", "initrd.gz", cmdline,
 	                      MAIN_MEM_START, MAIN_MEM_SIZE);
 	static Genode::Vmm vmm(&vm, M4IF_PHYS_BASE);

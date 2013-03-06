@@ -35,7 +35,7 @@ namespace Genode
 		 ** Vm_session interface **
 		 **************************/
 
-		Dataspace_capability cpu_state() {
+		Io_mem_dataspace_capability cpu_state() {
 			return call<Rpc_cpu_state>(); }
 
 		void exception_handler(Signal_context_capability handler) {

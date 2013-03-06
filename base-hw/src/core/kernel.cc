@@ -663,6 +663,23 @@ namespace Kernel
 			Vm_state       * const _state;
 			Signal_context * const _context;
 
+			void _flush_vm_state_cache()
+			{
+				unsigned long start = (unsigned long)_state & ~31;
+				unsigned long end   = start + sizeof(Vm_state);
+				asm volatile ("dsb                              \n"
+							  "1:                               \n"
+							  "mcr p15, 0, %[start], c7, c14, 1 \n"
+							  "add %[start], %[start], %2       \n"
+							  "cmp %[start], %[end]             \n"
+							  "blo 1b                           \n"
+							  "mcr p15, 0, %[iic], c7, c5, 0    \n"
+							  "dsb                              \n"
+							  : [start] "=&r" (start)
+							  : "0" (start), [end] "r" (end), [sz] "r" (32),
+							    [iic] "r" (0) : "memory");
+			}
+
 		public:
 
 			void * operator new (size_t, void * p) { return p; }
@@ -672,10 +689,13 @@ namespace Kernel
 			 */
 			Vm(void           * const state,
 			   Signal_context * const context)
-			: _state((Vm_state * const)state), _context(context) { }
+			: Schedule_context(1), _state((Vm_state * const)state), _context(context) { }
 
 			void run() {
-				cpu_scheduler()->insert(this); }
+				cpu_scheduler()->vm(this); }
+
+			void pause() {
+				cpu_scheduler()->vm(0); }
 
 
 			/**********************
@@ -684,6 +704,7 @@ namespace Kernel
 
 			void handle_exception()
 			{
+				_flush_vm_state_cache();
 				switch(_state->cpu_exception) {
 				case Genode::Cpu_state::INTERRUPT_REQUEST:
 				case Genode::Cpu_state::FAST_INTERRUPT_REQUEST:
@@ -692,13 +713,15 @@ namespace Kernel
 				case Genode::Cpu_state::DATA_ABORT:
 					_state->dfar = Cpu::Dfar::read();
 				default:
-					cpu_scheduler()->remove(this);
+					cpu_scheduler()->vm(0);
 					_context->trigger_signal(1);
 				}
 			}
 
 			void scheduled_next()
 			{
+				_flush_vm_state_cache();
+
 				/* set context pointer for mode switch */
 				_mt_client_context_ptr = (addr_t)_state;
 
@@ -1260,6 +1283,23 @@ namespace Kernel
 
 
 	/**
+	 * Do specific syscall for 'user', for details see 'syscall.h'
+	 */
+	void do_pause_vm(Thread * const user)
+	{
+		/* check permissions */
+		assert(user->pd_id() == core_id());
+
+		/* get targeted vm via its id */
+		Vm * const vm = Vm::pool()->object(user->user_arg_1());
+		assert(vm);
+
+		/* pause targeted vm */
+		vm->pause();
+	}
+
+
+	/**
 	 * Handle a syscall request
 	 *
 	 * \param user  thread that called the syscall
@@ -1301,6 +1341,7 @@ namespace Kernel
 			/* 26         */ do_delete_thread,
 			/* 27         */ do_signal_pending,
 			/* 28         */ do_resume_faulter,
+			/* 29         */ do_pause_vm,
 		};
 		enum { MAX_SYSCALL = sizeof(handle_sysc)/sizeof(handle_sysc[0]) - 1 };
 

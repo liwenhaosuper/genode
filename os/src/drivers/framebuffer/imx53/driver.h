@@ -15,6 +15,7 @@
 #include <ipu.h>
 #include <src.h>
 #include <ccm.h>
+#include <pwm.h>
 
 
 namespace Framebuffer {
@@ -31,26 +32,32 @@ class Framebuffer::Driver
 		Dataspace_capability _ds;
 		addr_t               _phys_base;
 
+		/* System reset controller registers */
+		Attached_io_mem_dataspace _src_mmio;
+		Src                       _src;
+
 		/* Clocks control module */
 		Attached_io_mem_dataspace _ccm_mmio;
 		Ccm                       _ccm;
 
-		/* System reset controller registers */
-		Attached_io_mem_dataspace _src_mmio;
-		Src                       _src;
+		Attached_io_mem_dataspace _iomuxc_mmio;
+		Iomuxc                    _iomuxc;
+
+		Attached_io_mem_dataspace _pwm_mmio;
+		Pwm                       _pwm;
 
 		/* Image processing unit memory */
 		Attached_io_mem_dataspace _ipu_mmio;
 		Ipu                       _ipu;
 
-		Gpio::Connection          _gpio;
+		//Gpio::Connection          _gpio;
 
 	public:
 
 		enum {
 			REFRESH          = 60,
-			WIDTH            = 800,
-			HEIGHT           = 480,
+			WIDTH            = 1024,
+			HEIGHT           = 768,
 			PIX_CLK          = 29850,
 			ROUND_PIX_CLK    = 38000,
 			LEFT_MARGIN      = 89,
@@ -62,7 +69,7 @@ class Framebuffer::Driver
 			BYTES_PER_PIXEL  = 2,
 			FRAMEBUFFER_SIZE = WIDTH * HEIGHT * BYTES_PER_PIXEL,
 
-			LCD_BL_GPIO      = 88,
+			LCD_BL_GPIO      = 173,
 			LCD_CONT_GPIO    = 1,
 		};
 
@@ -70,23 +77,24 @@ class Framebuffer::Driver
 		Driver()
 		: _ds(env()->ram_session()->alloc(FRAMEBUFFER_SIZE, false)),
 		  _phys_base(Dataspace_client(_ds).phys_addr()),
-		  _ccm_mmio(Board::CCM_BASE, Board::CCM_SIZE),
-		  _ccm((addr_t)_ccm_mmio.local_addr<void>()),
 		  _src_mmio(Board::SRC_BASE, Board::SRC_SIZE),
 		  _src((addr_t)_src_mmio.local_addr<void>()),
+		  _ccm_mmio(Board::CCM_BASE, Board::CCM_SIZE),
+		  _ccm((addr_t)_ccm_mmio.local_addr<void>()),
+		  _iomuxc_mmio(Board::IOMUXC_BASE, Board::IOMUXC_SIZE),
+		  _iomuxc((addr_t)_iomuxc_mmio.local_addr<void>()),
+		  _pwm_mmio(Board::PWM2_BASE, Board::PWM2_SIZE),
+		  _pwm((addr_t)_pwm_mmio.local_addr<void>()),
 		  _ipu_mmio(Board::IPU_BASE, Board::IPU_SIZE),
 		  _ipu((addr_t)_ipu_mmio.local_addr<void>())
 		{
-			/* reset ipu over src */
-			_src.write<Src::Ctrl_reg::Ipu_rst>(1);
-
-			_ccm.ipu_clk_enable();
-
 			_ipu.init(WIDTH, HEIGHT, WIDTH * BYTES_PER_PIXEL, _phys_base);
 
 			/* Turn on lcd power */
-			_gpio.direction_output(LCD_BL_GPIO, true);
-			_gpio.direction_output(LCD_CONT_GPIO, true);
+			_iomuxc.enable_di1();
+			_pwm.enable_display();
+			//_gpio.direction_output(LCD_BL_GPIO, true);
+			//_gpio.direction_output(LCD_CONT_GPIO, true);
 		}
 
 		Dataspace_capability dataspace() { return _ds; }

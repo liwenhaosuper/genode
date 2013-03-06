@@ -63,10 +63,10 @@ append_if [have_spec imx53] config {
 		<config/>
 	</start>
 	<start name="imx53_fb_drv">
-		<resource name="RAM" quantum="4M"/>
+		<resource name="RAM" quantum="6M"/>
 		<provides><service name="Framebuffer"/></provides>
 	</start>
-	<start name="dummy_input_drv">
+	<start name="imx53_input_drv">
 		<resource name="RAM" quantum="1M"/>
 		<provides><service name="Input"/></provides>
 	</start>}
@@ -100,9 +100,10 @@ set boot_modules {
 	linux
 	initrd.gz
 }
+
 lappend_if [have_spec imx53] boot_modules imx53_gpio_drv
 lappend_if [have_spec imx53] boot_modules imx53_fb_drv
-lappend_if [have_spec imx53] boot_modules dummy_input_drv
+lappend_if [have_spec imx53] boot_modules imx53_input_drv
 lappend_if [have_spec pl11x] boot_modules pl11x_drv
 lappend_if [have_spec ps2]   boot_modules ps2_drv
 

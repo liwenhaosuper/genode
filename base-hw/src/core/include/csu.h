@@ -123,10 +123,10 @@ namespace Genode
 				write<Csl19::Slave_a>(Csl00::UNSECURE);
 
 				/* GPIO */
-				write<Csl00::Slave_b>(Csl00::UNSECURE);
-				write<Csl01::Slave_a>(Csl00::UNSECURE);
-				write<Csl01::Slave_b>(Csl00::UNSECURE);
-				write<Csl02::Slave_a>(Csl00::UNSECURE);
+				//write<Csl00::Slave_b>(Csl00::UNSECURE);
+				//write<Csl01::Slave_a>(Csl00::UNSECURE);
+				//write<Csl01::Slave_b>(Csl00::UNSECURE);
+				//write<Csl02::Slave_a>(Csl00::UNSECURE);
 
 				/* IOMUXC TODO */
 				write<Csl05::Slave_a>(Csl00::UNSECURE);
@@ -141,9 +141,9 @@ namespace Genode
 				//write<Csl22::Slave_b>(Csl00::UNSECURE);
 
 				/* I2C */
-				write<Csl18::Slave_a>(Csl00::UNSECURE);
-				write<Csl17::Slave_b>(Csl00::UNSECURE);
-				write<Csl31::Slave_a>(Csl00::UNSECURE);
+				//write<Csl18::Slave_a>(Csl00::UNSECURE);
+				//write<Csl17::Slave_b>(Csl00::UNSECURE);
+				//write<Csl31::Slave_a>(Csl00::UNSECURE);
 
 				/* IPU */
 				//write<Csl24::Slave_a>(Csl00::UNSECURE);
@@ -214,7 +214,6 @@ namespace Genode
 				write<Master::Dap>(Master::UNSECURE_UNLOCKED);
 				write<Master::Esdhc1>(Master::UNSECURE_UNLOCKED);
 				write<Master::Esdhc2>(Master::UNSECURE_UNLOCKED);
-
 			}
 	};
 

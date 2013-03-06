@@ -72,8 +72,9 @@ namespace Kernel
 		SIGNAL_PENDING = 27,
 
 		/* vm specific */
-		NEW_VM = 24,
-		RUN_VM = 25,
+		NEW_VM   = 24,
+		RUN_VM   = 25,
+		PAUSE_VM = 29,
 	};
 
 	/*****************************************************************
@@ -515,6 +516,15 @@ namespace Kernel
 	 */
 	inline void run_vm(unsigned long const id = 0) {
 		syscall(RUN_VM, (Syscall_arg)id); }
+
+
+	/**
+	 * Pause a virtual-machine
+	 *
+	 * \param id  ID of the targeted vm
+	 */
+	inline void pause_vm(unsigned long const id = 0) {
+		syscall(PAUSE_VM, (Syscall_arg)id); }
 }
 
 #endif /* _INCLUDE__KERNEL__SYSCALLS_H_ */

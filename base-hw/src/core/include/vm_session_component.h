@@ -29,13 +29,13 @@ namespace Genode {
 	{
 		private:
 
-			Rpc_entrypoint          *_ds_ep;
-			Range_allocator         *_ram_alloc;
-			unsigned long            _vm_id;
-			void                    *_vm;
-			addr_t                   _ds_addr;
-			Dataspace_component      _ds;
-			Dataspace_capability     _ds_cap;
+			Rpc_entrypoint             *_ds_ep;
+			Range_allocator            *_ram_alloc;
+			unsigned long               _vm_id;
+			void                       *_vm;
+			addr_t                      _ds_addr;
+			Dataspace_component         _ds;
+			Io_mem_dataspace_capability _ds_cap;
 
 			static size_t _ds_size() {
 				return align_addr(sizeof(Cpu_state_modes),
@@ -64,7 +64,7 @@ namespace Genode {
 			 ** Vm session interface **
 			 **************************/
 
-			Dataspace_capability cpu_state(void) { return _ds_cap; }
+			Io_mem_dataspace_capability cpu_state(void) { return _ds_cap; }
 			void exception_handler(Signal_context_capability handler);
 			void run(void);
 	};

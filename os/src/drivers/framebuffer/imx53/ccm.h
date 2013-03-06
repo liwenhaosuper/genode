@@ -30,6 +30,10 @@ struct Ccm : Genode::Mmio
 		struct Ipu_hs_mask : Bitfield <21, 1> { };
 	};
 
+	struct Cscmr2 : Register<0x20, 32> {};
+
+	struct Cdcdr : Register<0x30, 32> {};
+
 	/**
 	 * Low power control register
 	 */
@@ -38,29 +42,22 @@ struct Ccm : Genode::Mmio
 		struct Bypass_ipu_hs : Bitfield<18, 1> { };
 	};
 
-	/**
-	 *
-	 */
-	struct Cccr5 : Register<0x7c, 32>
-	{
-		struct Ipu_clk_en : Bitfield<10, 2> { };
-	};
+	template <unsigned OFF>
+	struct Ccgr : Register<0x68 + OFF*4, 32> {};
 
-	void ipu_clk_enable(void)
+	Ccm(Genode::addr_t const mmio_base) : Genode::Mmio(mmio_base)
 	{
-		write<Cccr5::Ipu_clk_en>(3);
-		write<Ccdr::Ipu_hs_mask>(0);
+
+		write<Ccgr<0> >(~0UL);
+		write<Ccgr<1> >(~0UL);
+		write<Ccgr<2> >(0xffff7fff);
+		write<Ccgr<5> >(~0UL);
+		write<Ccgr<6> >(~0UL);
+		write<Cdcdr>(0x14370092);
 		write<Clpcr::Bypass_ipu_hs>(0);
+		write<Ccdr::Ipu_hs_mask>(0);
+		write<Cscmr2>(0xa2b32f0b);
 	}
-
-	void ipu_clk_disable(void)
-	{
-		write<Cccr5::Ipu_clk_en>(0);
-		write<Ccdr::Ipu_hs_mask>(1);
-		write<Clpcr::Bypass_ipu_hs>(1);
-	}
-
-	Ccm(Genode::addr_t const mmio_base) : Genode::Mmio(mmio_base) { }
 
 };
 

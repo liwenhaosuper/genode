@@ -43,7 +43,7 @@ namespace Kernel
 	/* kernel configuration */
 	enum {
 		DEFAULT_STACK_SIZE = 1*1024*1024,
-		USER_TIME_SLICE_MS = 100,
+		USER_TIME_SLICE_MS = 10,
 		MAX_PDS = 256,
 		MAX_THREADS = 256,
 		MAX_SIGNAL_RECEIVERS = 256,
@@ -437,13 +437,15 @@ namespace Kernel
 			unsigned const _lap_time; /* Time that an entry gets for one
 			                           * scheduling lap to consume */
 
+			ENTRY_T * _vm; /* Default entry, can't be removed */
+
 		public:
 
 			/**
 			 * Constructor
 			 */
 			Scheduler(ENTRY_T * const idle, unsigned const lap_time)
-			: _idle(idle), _lap_time(lap_time) { assert(_lap_time && _idle); }
+			: _idle(idle), _lap_time(lap_time), _vm(0) { assert(_lap_time && _idle); }
 
 			/**
 			 * Returns the entry wich shall scheduled next
@@ -458,7 +460,7 @@ namespace Kernel
 				ENTRY_T * e = _entries.head();
 				if (!e) {
 					t = _lap_time;
-					return _idle;
+					return (_vm) ? _vm : _idle;
 				}
 				e->Entry::_consume(t);
 
@@ -468,6 +470,18 @@ namespace Kernel
 					_entries.head_to_tail();
 					e = _entries.head();
 				}
+#if 0
+				ENTRY_T * ptr = _entries.head()->next();
+				while(ptr) {
+					if (ptr->priority() < e->priority()) {
+						while (ptr != _entries.head())
+							_entries.head_to_tail();
+						t = 0;
+						return next_entry(t);
+					}
+					ptr = ptr->next();
+				}
+#endif
 
 				/* return next entry and appropriate portion of time */
 				t = e->Entry::_time;
@@ -477,8 +491,12 @@ namespace Kernel
 			/**
 			 * Get the currently scheduled entry
 			 */
-			ENTRY_T * current_entry() const {
-				return _entries.head() ? _entries.head() : _idle; }
+			ENTRY_T * current_entry() const
+			{
+				if (!_entries.head())
+					return _vm ? _vm : _idle;
+				return _entries.head();
+			}
 
 			/**
 			 * Ensure that 'e' does participate in scheduling afterwards
@@ -504,6 +522,8 @@ namespace Kernel
 				if (e) e->_time = 0;
 				return;
 			}
+
+			void vm(ENTRY_T * e) { _vm = e; }
 	};
 
 	class Schedule_context;
@@ -514,10 +534,17 @@ namespace Kernel
 	 */
 	class Schedule_context : public Cpu_scheduler::Entry
 	{
+		private:
+
+			unsigned char _prio;
+
 		public:
+
+			Schedule_context(unsigned char prio = 0) {}
 
 			virtual void handle_exception() = 0;
 			virtual void scheduled_next() = 0;
+			virtual unsigned char priority() { return _prio; }
 	};
 
 	/**

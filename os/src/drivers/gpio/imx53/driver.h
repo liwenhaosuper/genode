@@ -210,8 +210,8 @@ Gpio::Driver::Driver()
 
 	for (int i = 0; i < MAX_GPIOS; ++i) {
 		Gpio_reg *gpio_reg = _get_gpio_bank(i);
-		gpio_reg->write<Gpio_reg::Int_conf::Pin>(Gpio_reg::Int_conf::HIGH_LEVEL,
-		                                         _get_gpio_index(i));
+		gpio_reg->write<Gpio_reg::Int_conf::Pin>(Gpio_reg::Int_conf::LOW_LEVEL,
+												 _get_gpio_index(i));
 	}
 }
 

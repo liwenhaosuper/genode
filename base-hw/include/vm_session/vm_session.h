@@ -18,7 +18,7 @@
 #include <base/rpc_args.h>
 #include <base/signal.h>
 #include <session/session.h>
-#include <ram_session/ram_session.h>
+#include <io_mem_session/io_mem_session.h>
 
 namespace Genode {
 
@@ -34,7 +34,7 @@ namespace Genode {
 			/**
 			 * Get dataspace of the CPU state of the VM
 			 */
-			virtual Dataspace_capability cpu_state(void) = 0;
+			virtual Io_mem_dataspace_capability cpu_state(void) = 0;
 
 			/**
 			 * Register signal handler for exceptions of the Vm
@@ -50,7 +50,7 @@ namespace Genode {
 			 ** RPC declaration **
 			 *********************/
 
-			GENODE_RPC(Rpc_cpu_state, Dataspace_capability, cpu_state);
+			GENODE_RPC(Rpc_cpu_state, Io_mem_dataspace_capability, cpu_state);
 			GENODE_RPC(Rpc_exception_handler, void, exception_handler,
 			           Signal_context_capability);
 			GENODE_RPC(Rpc_run, void, run);
