@@ -1,0 +1,187 @@
+#
+# Build
+#
+
+if {[have_spec foc_panda] == 0} {
+   puts "Runs on Fiasco.OC only"
+   exit 0
+}
+
+build {
+	core
+	init
+	drivers/timer
+	drivers/framebuffer
+	drivers/sd_card
+	drivers/usb
+	server/nitpicker
+	server/nit_fb
+	server/part_blk
+	server/terminal
+	server/terminal_log
+	l4android
+}
+create_boot_directory
+
+#
+# Config
+#
+install_config {
+<config prio_levels="2">
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="RAM"/>
+		<service name="IRQ"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="CAP"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+		<service name="SIGNAL"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+	<start name="fb_drv">
+		<binary name="omap4_fb_drv"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="Framebuffer"/></provides>
+	</start>
+	<start name="sd_card_drv">
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="Block"/></provides>
+	</start>
+	<start name="usb_drv">
+		<resource name="RAM" quantum="12M"/>
+		<provides>
+			<service name="Input"/>
+			<service name="Nic"/>
+		</provides>
+		<config>
+			<hid/>
+			<nic mac="2e:60:90:0c:4e:01" />
+		</config>
+	</start>
+	<start name="part_blk">
+		<resource name="RAM" quantum="2M"/>
+		<provides><service name="Block"/></provides>
+		<config>
+			<policy label="l4android -> sda" partition="2" />
+		</config>
+		<route>
+			<service name="Block"> <child name="sd_card_drv"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="nitpicker">
+		<resource name="RAM" quantum="2M"/>
+		<provides><service name="Nitpicker"/></provides>
+		<route>
+			<service name="Input">       <child name="usb_drv"/> </service>
+			<service name="Framebuffer"> <child name="fb_drv"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="android_fb">
+		<binary name="nit_fb"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides>
+			<service name="Framebuffer"/>
+			<service name="Input"/>
+		</provides>
+		<config xpos="0" ypos="0" width="640" height="480" refresh_rate="25"/>
+	</start>
+	<start name="android_term_fb">
+		<binary name="nit_fb"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides>
+			<service name="Framebuffer"/>
+			<service name="Input"/>
+		</provides>
+		<config xpos="0" ypos="482" width="1024" height="268" refresh_rate="25"/>
+	</start>
+	<start name="log_term_fb">
+		<binary name="nit_fb"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides>
+			<service name="Framebuffer"/>
+			<service name="Input"/>
+		</provides>
+		<config xpos="642" ypos="0" width="380" height="480" refresh_rate="25"/>
+	</start>
+	<start name="android_term">
+		<binary name="terminal"/>
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Terminal"/></provides>
+		<route>
+			<service name="Input">       <child name="android_term_fb"/> </service>
+			<service name="Framebuffer"> <child name="android_term_fb"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="log_term">
+		<binary name="terminal"/>
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Terminal"/></provides>
+		<route>
+			<service name="Input">       <child name="log_term_fb"/> </service>
+			<service name="Framebuffer"> <child name="log_term_fb"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="terminal_log">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="LOG"/></provides>
+		<route>
+			<service name="Terminal"> <child name="log_term"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="l4android">
+		<resource name="RAM" quantum="512M"/>
+		<config args="mem=128M console=ttyS0 l4x_rd=root-ginger.gz">
+			<block label="sda"/>
+		</config>
+		<route>
+			<service name="Input">       <child name="android_fb"/>   </service>
+			<service name="Framebuffer"> <child name="android_fb"/>   </service>
+			<service name="Terminal">    <child name="android_term"/> </service>
+			<service name="LOG">         <child name="terminal_log"/> </service>
+			<service name="Block">       <child name="part_blk"/>     </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+</config>}
+
+
+#
+# Boot modules
+#
+
+set initrd_uri "http://genode.org/files/release-11.11/l4lx/root-arm-ginger.gz"
+if {![file exists bin/root-ginger.gz]} {
+	puts "Download initramfs ..."
+	exec curl $initrd_uri > bin/root-ginger.gz 2> /dev/null
+}
+
+build_boot_image {
+	core
+	init
+	timer
+	omap4_fb_drv
+	usb_drv
+	sd_card_drv
+	nitpicker
+	nit_fb
+	part_blk
+	terminal
+	terminal_log
+	l4android
+	root-ginger.gz
+}
