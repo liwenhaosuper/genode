@@ -63,13 +63,15 @@ class Vmm::Framebuffer : public Genode::Thread<8192>
 
 		void _blit()
 		{
-			Genode::uint16_t *src = (Genode::uint16_t*)_vm->ram()->va(_fb_phys_base);
-			Genode::uint16_t *dst = (Genode::uint16_t*)_fb_small_base;
-			for (unsigned line = 0; line < SMALL_HEIGHT;
-			     line++, src+=VM_WIDTH*3, dst+=3*SMALL_WIDTH)
-				for (unsigned px = 0; px < SMALL_WIDTH; px++, dst++, src+=4)
-					*dst = *src;
-			_fb.refresh(0, 0, SMALL_WIDTH, SMALL_HEIGHT);
+			try {
+				Genode::uint16_t *src = (Genode::uint16_t*)_vm->ram()->va(_fb_phys_base);
+				Genode::uint16_t *dst = (Genode::uint16_t*)_fb_small_base;
+				for (unsigned line = 0; line < SMALL_HEIGHT;
+					 line++, src+=VM_WIDTH*3, dst+=3*SMALL_WIDTH)
+					for (unsigned px = 0; px < SMALL_WIDTH; px++, dst++, src+=4)
+						*dst = *src;
+				_fb.refresh(0, 0, SMALL_WIDTH, SMALL_HEIGHT);
+			} catch(Ram::Invalid_addr) {}
 		}
 
 		void _halt() { _lock.lock();   }
@@ -85,7 +87,7 @@ class Vmm::Framebuffer : public Genode::Thread<8192>
 		  _fb_small_base(Genode::env()->rm_session()->attach(_fb.dataspace())),
 		  _offset(BACKGROUND),
 		  _alpha(255),
-		  _lock(Genode::Lock::LOCKED),
+		  _lock(Genode::Lock::UNLOCKED),
 		  _initialized(false) { start(); }
 
 

@@ -101,7 +101,6 @@ class Vmm::Vmm : public Thread<8192>
 		Signal_context            _stop_bt_context;
 		Signal_context            _bomb_bt_context;
 		Signal_context            _power_bt_context;
-		Signal_context            _fs_bt_context;
 		Signal_context_capability _input_sig_cxt;
 		Vmm_gui::Connection       _gui;
 		Vm                       *_vm;
@@ -168,7 +167,6 @@ class Vmm::Vmm : public Thread<8192>
 			_gui.stop_sigh(_sig_rcv.manage(&_stop_bt_context));
 			_gui.bomb_sigh(_sig_rcv.manage(&_bomb_bt_context));
 			_gui.power_sigh(_sig_rcv.manage(&_power_bt_context));
-			_gui.fullscreen_sigh(_sig_rcv.manage(&_fs_bt_context));
 			_vm->start();
 			_gui.set_state(_vm->state());
 
@@ -181,14 +179,13 @@ class Vmm::Vmm : public Thread<8192>
 						_gui.set_state(_vm->state());
 				} else if (s.context() == &_input_context) {
 					if (_foreground) {
-						_foreground = false;
 						_input.background();
 						_fb.background();
 					} else {
-						_foreground = true;
 						_fb.foreground();
 						_input.foreground();
 					}
+					_foreground = !_foreground;
 				} else if ((s.context() == &_play_bt_context))  {
 					_running = !_running;
 					if (!_running) {
@@ -215,10 +212,6 @@ class Vmm::Vmm : public Thread<8192>
 						_gui.set_state(_vm->state());
 				} else if ((s.context() == &_power_bt_context)) {
 					_input.power_button();
-				} else if ((s.context() == &_fs_bt_context))    {
-					_foreground = true;
-					_fb.foreground();
-					_input.foreground();
 				} else {
 					PWRN("Invalid context");
 					continue;
