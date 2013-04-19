@@ -31,6 +31,7 @@
 
 class Framebuffer_widget : public Compound_widget<QGroupBox, QHBoxLayout>
 {
+	Q_OBJECT
 
 	private:
 
@@ -46,6 +47,8 @@ class Framebuffer_widget : public Compound_widget<QGroupBox, QHBoxLayout>
 
 class Register_widget : public Compound_widget<QGroupBox, QGridLayout, 1>
 {
+	Q_OBJECT
+
 	private:
 
 		QMember<QLabel> _l_r0;

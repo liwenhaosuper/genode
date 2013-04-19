@@ -62,7 +62,7 @@ Register_widget::Register_widget()
    _l_sp_irq("sp_irq:"),
    _l_lr_irq("lr_irq:"),
    _l_spsr_irq("spsr_irq:"),
-   _l_exc_lab("Exception:")
+   _l_exc_lab("Exception type:")
 {
 	_layout->addWidget(_l_r0,   0, 0);
 	_layout->addWidget(_l_r1,   1, 0);
@@ -77,7 +77,7 @@ Register_widget::Register_widget()
 	_layout->addWidget(_l_r10, 10, 0);
 	_layout->addWidget(_l_r11, 11, 0);
 	_layout->addWidget(_l_r12, 12, 0);
-	_layout->addWidget(_l_exc_lab, 13, 0);
+	_layout->addWidget(_l_exc_lab, 13, 0, 1, 2);
 
 	_layout->addWidget(_le_r0,  0,  1);
 	_layout->addWidget(_le_r1,  1,  1);
@@ -92,7 +92,6 @@ Register_widget::Register_widget()
 	_layout->addWidget(_le_r10, 10, 1);
 	_layout->addWidget(_le_r11, 11, 1);
 	_layout->addWidget(_le_r12, 12, 1);
-	_layout->addWidget(_l_exc_type, 13, 1);
 
 	_layout->addWidget(_l_r13,      0,  2);
 	_layout->addWidget(_l_r14,      1,  2);
@@ -107,6 +106,7 @@ Register_widget::Register_widget()
 	_layout->addWidget(_l_sp_irq,   10, 2);
 	_layout->addWidget(_l_lr_irq,   11, 2);
 	_layout->addWidget(_l_spsr_irq, 12, 2);
+	_layout->addWidget(_l_exc_type, 13, 2, 1, 2);
 
 	_layout->addWidget(_le_r13,      0,  3);
 	_layout->addWidget(_le_r14,      1,  3);
@@ -224,5 +224,5 @@ Main_window::Main_window()
 	_layout->addWidget(_reg_widget);
 	_layout->addStretch();
 	_layout->addWidget(_control_bar);
-	_layout->setContentsMargins(3, 3, 3, 3);
+	_layout->setContentsMargins(5, 5, 5, 5);
 }

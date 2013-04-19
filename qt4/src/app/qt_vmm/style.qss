@@ -22,3 +22,13 @@ Bomb_button {
 Power_button {
 	border-image: url(:power.png);
 }
+
+Register_widget, Framebuffer_widget {
+	border: none;
+	font-weight: bold;
+    padding-top: 14px;
+}
+
+Register_widget::title, Framebuffer_widget::title {
+    padding-left: 0px;
+}
