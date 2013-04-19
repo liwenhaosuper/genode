@@ -1,0 +1,24 @@
+Play_pause_button, Stop_button, Bomb_button, Power_button {
+	width: 32px;
+	height: 32px;
+}
+
+Play_pause_button#play {
+	border-image: url(:pause.png);
+}
+
+Play_pause_button#pause {
+	border-image: url(:play.png);
+}
+
+Stop_button {
+	border-image: url(:stop.png);
+}
+
+Bomb_button {
+	border-image: url(:bomb.png);
+}
+
+Power_button {
+	border-image: url(:power.png);
+}
