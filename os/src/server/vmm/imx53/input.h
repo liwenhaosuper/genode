@@ -15,34 +15,34 @@
 #define _SRC__SERVER__VMM__IMX53__INPUT_H_
 
 /* Genode includes */
+#include <base/signal.h>
 #include <nitpicker_session/connection.h>
 #include <nitpicker_view/client.h>
+#include <timer_session/connection.h>
 #include <input/event_queue.h>
 #include <input/event.h>
+#include <input/keycodes.h>
 
 /* local includes */
 #include <vm.h>
+#include <framebuffer.h>
 
 namespace Vmm {
 	class Input;
 }
 
 
-class Vmm::Input
+class Vmm::Input : public Genode::Thread<8192>
 {
 	private:
 
 		Vm                        *_vm;
 		Nitpicker::Connection      _nitpicker;
 		Nitpicker::View_capability _view_cap;
+		Event_queue                _local_queue;
 		::Input::Event            *_ev_buf;
-		unsigned                   _num_events;
-		unsigned                   _event;
-
-		enum Resolution {
-			WIDTH  = 1024,
-			HEIGHT = 768
-		};
+		Genode::Signal_transmitter _sig_trans;
+		Timer::Connection          _timer;
 
 		enum Opcodes {
 			GET_EVENT,
@@ -57,19 +57,54 @@ class Vmm::Input
 
 	public:
 
-		Input(Vm *vm)
-		: _vm(vm),
-		  _nitpicker(WIDTH, HEIGHT, false),
+		Input(Vm *vm, Genode::Signal_context_capability cap)
+		: Genode::Thread<8192>("input_handler"),
+		  _vm(vm),
 		  _view_cap(_nitpicker.create_view()),
 		  _ev_buf(Genode::env()->rm_session()->attach(_nitpicker.input()->dataspace())),
-		  _num_events(0),
-		  _event(0)
+		  _sig_trans(cap)
 		{
+			_local_queue.enable();
+			start();
+		}
+
+
+		void entry()
+		{
+			while (true) {
+				if (!_nitpicker.input()->is_pending())
+					_timer.msleep(10);
+
+				unsigned num_events = _nitpicker.input()->flush();
+				for (unsigned i = 0; i < num_events; i++) {
+					::Input::Event *ev = &_ev_buf[i];
+					if (ev->keycode() == ::Input::KEY_POWER) {
+						if (ev->type() == ::Input::Event::PRESS)
+							_sig_trans.submit();
+					} else
+						_local_queue.add(*ev);
+				}
+			}
+		}
+
+
+		void foreground() {
 			using namespace Nitpicker;
 
-			View_client(_view_cap).viewport(0, 0, WIDTH, HEIGHT, 0, 0, true);
-			View_client(_view_cap).stack(Nitpicker::View_capability(), true, true);
-			View_client(_view_cap).title("Android");
+			_view_cap = _nitpicker.create_view();
+			View_client vc(_view_cap);
+			vc.title("Android");
+			vc.viewport(0, 0, VM_WIDTH, VM_HEIGHT, 0, 0, true);
+			vc.stack(Nitpicker::View_capability(), true, true);
+		}
+
+		void background() { _nitpicker.destroy_view(_view_cap); }
+
+		void power_button() {
+			_local_queue.add(::Input::Event(::Input::Event::PRESS,
+			                                ::Input::KEY_POWER, 0, 0, 0, 0));
+			_local_queue.add(::Input::Event(::Input::Event::RELEASE,
+			                                ::Input::KEY_POWER, 0, 0, 0, 0));
 		}
 
 		void handle(Vm_state * volatile state)
@@ -79,36 +114,27 @@ class Vmm::Input
 				{
 					state->r0 = INVALID;
 
-					if (!_num_events && _nitpicker.input()->is_pending())
-						_num_events = _nitpicker.input()->flush();
+					if (_local_queue.empty())
+						return;
 
-					if (_event < _num_events) {
-						::Input::Event *ev = &_ev_buf[_event];
-						switch (ev->type()) {
-						case ::Input::Event::PRESS:
-							state->r0 = PRESS;
-							state->r3 = ev->keycode();
-							break;
-						case ::Input::Event::RELEASE:
-							state->r0 = RELEASE;
-							state->r3 = ev->keycode();
-							break;
-						case ::Input::Event::MOTION:
-							state->r0 = MOTION;
-							break;
-						default:
-							return;
-						}
-						state->r1 = ev->ax();
-						state->r2 = ev->ay();
-						_event++;
+					::Input::Event ev = _local_queue.get();
+					switch (ev.type()) {
+					case ::Input::Event::PRESS:
+						state->r0 = PRESS;
+						state->r3 = ev.keycode();
+						break;
+					case ::Input::Event::RELEASE:
+						state->r0 = RELEASE;
+						state->r3 = ev.keycode();
+						break;
+					case ::Input::Event::MOTION:
+						state->r0 = MOTION;
+						break;
+					default:
+						return;
 					}
-
-					if (_event == _num_events) {
-						_num_events = 0;
-						_event      = 0;
-					}
-
+					state->r1 = ev.ax();
+					state->r2 = ev.ay();
 					break;
 				}
 			default:

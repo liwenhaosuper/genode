@@ -17,6 +17,9 @@
 #include <base/thread.h>
 #include <drivers/board.h>
 
+/* QT gui */
+#include <vmm_gui_session/connection.h>
+
 /* local includes */
 #include <vm.h>
 #include <atag.h>
@@ -55,11 +58,62 @@ class Vmm::Vmm : public Thread<8192>
 			INPUT,
 		};
 
-		Vm                   *_vm;
-		Io_mem_connection     _m4if_io_mem;
-		M4if                  _m4if;
-		Framebuffer           _fb;
-		Input                 _input;
+		class Input_handler : public Thread<8192>
+		{
+			private:
+
+				::Input::Session  *_input;
+				::Input::Event    *_ev_buf;
+				Signal_transmitter _transmitter;
+				Timer::Connection  _timer;
+
+			public:
+
+				Input_handler(::Input::Session *input, Signal_context_capability cap)
+				: Thread<8192>("input_handler"),
+				  _input(input),
+				  _ev_buf(Genode::env()->rm_session()->attach(input->dataspace())),
+				  _transmitter(cap) { start(); }
+
+				void entry() {
+					while (true) {
+						if (!_input->is_pending())
+							_timer.msleep(20);
+
+						unsigned num_events = _input->flush();
+						for (unsigned i = 0; i < num_events; i++) {
+							::Input::Event *ev = &_ev_buf[i];
+							if (ev->keycode() == ::Input::KEY_POWER ||
+								ev->keycode() == ::Input::BTN_LEFT) {
+								if (ev->type() == ::Input::Event::PRESS)
+									_transmitter.submit();
+							}
+						}
+					}
+				}
+		};
+
+
+		Signal_receiver           _sig_rcv;
+		Signal_context            _vm_context;
+		Signal_context            _input_context;
+		Signal_context            _play_bt_context;
+		Signal_context            _stop_bt_context;
+		Signal_context            _bomb_bt_context;
+		Signal_context            _power_bt_context;
+		Signal_context            _fs_bt_context;
+		Signal_context_capability _input_sig_cxt;
+		Vmm_gui::Connection       _gui;
+		Vm                       *_vm;
+		Io_mem_connection         _m4if_io_mem;
+		M4if                      _m4if;
+		Nitpicker::Connection     _nitpicker;
+		Nitpicker::View_client    _view;
+		Framebuffer               _fb;
+		Input                     _input;
+		Input_handler             _input_handler;
+		bool                      _foreground;
+		bool                      _running;
 
 		void _handle_hypervisor_call()
 		{
@@ -108,32 +162,89 @@ class Vmm::Vmm : public Thread<8192>
 
 		void entry()
 		{
-			Signal_receiver sig_rcv;
-			Signal_context  sig_cxt;
-			Signal_context_capability sig_cap(sig_rcv.manage(&sig_cxt));
-			_vm->start(sig_cap);
+			_vm->sig_handler(_sig_rcv.manage(&_vm_context));
+			_gui.show_view(_view, SMALL_WIDTH, SMALL_HEIGHT);
+			_gui.play_resume_sigh(_sig_rcv.manage(&_play_bt_context));
+			_gui.stop_sigh(_sig_rcv.manage(&_stop_bt_context));
+			_gui.bomb_sigh(_sig_rcv.manage(&_bomb_bt_context));
+			_gui.power_sigh(_sig_rcv.manage(&_power_bt_context));
+			_gui.fullscreen_sigh(_sig_rcv.manage(&_fs_bt_context));
+			_vm->start();
+			_gui.set_state(_vm->state());
 
 			while (true) {
-				_vm->run();
-				Signal s = sig_rcv.wait_for_signal();
-				if (s.context() != &sig_cxt) {
+				Signal s = _sig_rcv.wait_for_signal();
+				if (s.context() == &_vm_context) {
+					if (_handle_vm())
+						_vm->run();
+					else
+						_gui.set_state(_vm->state());
+				} else if (s.context() == &_input_context) {
+					if (_foreground) {
+						_foreground = false;
+						_input.background();
+						_fb.background();
+					} else {
+						_foreground = true;
+						_fb.foreground();
+						_input.foreground();
+					}
+				} else if ((s.context() == &_play_bt_context))  {
+					_running = !_running;
+					if (!_running) {
+						_vm->pause();
+						_gui.set_state(_vm->state());
+					} else
+						_vm->run();
+				} else if ((s.context() == &_stop_bt_context))  {
+					if (_running)
+						_vm->pause();
+					_running = false;
+					_vm->start();
+					_gui.set_state(_vm->state());
+				} else if ((s.context() == &_bomb_bt_context))  {
+					if (_running)
+						_vm->pause();
+					/* real fuck up */
+					_vm->state()->ip   = 0x80041e84; /* bad_stuff addr  */
+					_vm->state()->cpsr = 0x93;       /* supervisor mode */
+					_vm->state()->r9   = Board::IPU_BASE;
+					if (_running)
+						_vm->run();
+					else
+						_gui.set_state(_vm->state());
+				} else if ((s.context() == &_power_bt_context)) {
+					_input.power_button();
+				} else if ((s.context() == &_fs_bt_context))    {
+					_foreground = true;
+					_fb.foreground();
+					_input.foreground();
+				} else {
 					PWRN("Invalid context");
 					continue;
 				}
-				if ((s.context() == &sig_cxt) && !_handle_vm())
-					return;
 			}
 		};
 
 	public:
 
 		Vmm(Vm *vm)
-		: _vm(vm),
+		: _input_sig_cxt(_sig_rcv.manage(&_input_context)),
+		  _vm(vm),
 		  _m4if_io_mem(Board::M4IF_BASE, Board::M4IF_SIZE),
 		  _m4if((addr_t)env()->rm_session()->attach(_m4if_io_mem.dataspace())),
-		  _fb(vm),
-		  _input(vm) {
-			_m4if.set_region(SECURE_MEM_START, SECURE_MEM_SIZE); }
+		  _view(_nitpicker.create_view()),
+		  _fb(vm, _nitpicker.framebuffer_session()),
+		  _input(vm, _input_sig_cxt),
+		  _input_handler(_nitpicker.input(), _input_sig_cxt),
+		  _foreground(false),
+		  _running(false)
+		{
+			_m4if.set_region(SECURE_MEM_START, SECURE_MEM_SIZE);
+			_view.title("VM fb");
+			_view.viewport(2000, 2000, SMALL_WIDTH, SMALL_HEIGHT, 0, 0, true);
+			_view.stack(Nitpicker::View_capability(), true, true);
+		}
 };
 
 

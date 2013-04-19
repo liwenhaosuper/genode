@@ -43,7 +43,8 @@ class Framebuffer::Session_component :
 			return Mode(Driver::WIDTH, Driver::HEIGHT, Mode::RGB565); }
 		void mode_sigh(Genode::Signal_context_capability) { }
 		void refresh(int, int, int, int) { }
-		void overlay(addr_t phys_base) { _driver.overlay(phys_base); }
+		void overlay(addr_t phys_base, int x, int y, int alpha) {
+			_driver.overlay(phys_base, x, y, alpha); }
 };
 
 int main(int, char **)

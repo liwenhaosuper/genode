@@ -126,21 +126,24 @@ class Vm {
 		  _ram_iomem(ram_base, ram_size),
 		  _ram(ram_base, ram_size, (Genode::addr_t)Genode::env()->rm_session()->attach(_ram_iomem.dataspace())),
 		  _mach_type(mach_type),
-		  _board_rev(board_rev) {
-			Genode::memset((void*)_state, 0, sizeof(Vm_state)); }
+		  _board_rev(board_rev) { }
 
-		void start(Genode::Signal_context_capability sig_cap)
+		void start()
 		{
+			Genode::memset((void*)_state, 0, sizeof(Vm_state));
 			_load_elf();
 			_load_initrd();
 			_prepare_atag();
 			_state->cpsr = 0x93; /* SVC mode and IRQs disabled */
 			_state->r1   = _mach_type;
 			_state->r2   = _ram.base() + ATAG_OFFSET; /* ATAG addr */
-			_vm_con.exception_handler(sig_cap);
 		}
 
-		void run() { _vm_con.run(); }
+		void sig_handler(Genode::Signal_context_capability sig_cap) {
+			_vm_con.exception_handler(sig_cap); }
+
+		void run()   { _vm_con.run();   }
+		void pause() { _vm_con.pause(); }
 
 		void dump()
 		{

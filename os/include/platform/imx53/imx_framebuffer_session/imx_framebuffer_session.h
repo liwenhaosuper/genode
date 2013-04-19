@@ -24,14 +24,14 @@ namespace Framebuffer {
 	{
 		virtual ~Imx_session() { }
 
-		virtual void overlay(Genode::addr_t phys_base) = 0;
+		virtual void overlay(Genode::addr_t phys_base, int x, int y, int alpha) = 0;
 
 
 		/*********************
 		 ** RPC declaration **
 		 *********************/
 
-		GENODE_RPC(Rpc_overlay, void, overlay, Genode::addr_t);
+		GENODE_RPC(Rpc_overlay, void, overlay, Genode::addr_t, int, int, int);
 
 		GENODE_RPC_INTERFACE_INHERIT(Session, Rpc_overlay);
 	};

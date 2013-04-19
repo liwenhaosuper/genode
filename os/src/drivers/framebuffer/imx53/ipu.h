@@ -402,7 +402,7 @@ struct Ipu : Genode::Mmio
 		write<Dp_com_conf>(1 << 0 | 1 << 2);
 		write<Srm_pri2::Dp_m_srm>(Srm_pri2::Dp_m_srm::UPDATE_NOW);
 
-		write<Gr_wnd_ctl_sync>(0x00000000);
+		write<Gr_wnd_ctl_sync>(0xff000000);
 		write<Srm_pri2::Dp_m_srm>(Srm_pri2::Dp_m_srm::UPDATE_NOW);
 
 #else
@@ -520,12 +520,18 @@ struct Ipu : Genode::Mmio
 	}
 
 
-	void overlay_base(Genode::addr_t phys_base)
+	void overlay(Genode::addr_t phys_base, int x, int y, int alpha)
 	{
 		volatile uint32_t *ptr = (volatile uint32_t*)
 			(base + Cp_mem::OFFSET + CHAN_DP_PRIMARY_AUXI*sizeof(Cp_mem));
 		ptr[8] = (((phys_base >> 3) & 0b111) << 29) | (phys_base >> 3);
 		ptr[9] = (phys_base >> 6);
+
+		write<Dp_fg_pos_sync>(x << 16 | y);
+		write<Srm_pri2::Dp_m_srm>(Srm_pri2::Dp_m_srm::UPDATE_NOW);
+
+		write<Gr_wnd_ctl_sync>(alpha << 24);
+		write<Srm_pri2::Dp_m_srm>(Srm_pri2::Dp_m_srm::UPDATE_NOW);
 	}
 
 

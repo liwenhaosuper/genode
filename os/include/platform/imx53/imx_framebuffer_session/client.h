@@ -38,8 +38,8 @@ namespace Framebuffer {
 		void refresh(int x, int y, int w, int h) {
 			call<Rpc_refresh>(x, y, w, h); }
 
-		void overlay(Genode::addr_t phys_addr) {
-			call<Rpc_overlay>(phys_addr); }
+		void overlay(Genode::addr_t phys_addr, int x, int y, int alpha) {
+			call<Rpc_overlay>(phys_addr, x, y, alpha); }
 	};
 }
 

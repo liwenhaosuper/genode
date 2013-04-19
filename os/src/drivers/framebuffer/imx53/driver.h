@@ -99,6 +99,7 @@ class Framebuffer::Driver
 
 		Dataspace_capability dataspace() { return _ds; }
 
-		void overlay(addr_t phys_base) { _ipu.overlay_base(phys_base); }
+		void overlay(addr_t phys_base, int x, int y, int alpha) {
+			_ipu.overlay(phys_base, x, y, alpha); }
 };
 

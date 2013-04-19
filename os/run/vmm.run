@@ -16,8 +16,8 @@ set build_components {
 	  drivers/timer
 	  drivers/input
 	  server/nitpicker
-	  test/nitpicker
 	  server/vmm
+	  app/qt_vmm
 }
 lappend_if [have_spec imx53] build_components drivers/gpio
 
@@ -80,11 +80,12 @@ append config {
 		<resource name="RAM" quantum="1M"/>
 		<provides><service name="Nitpicker"/></provides>
 	</start>
-	<start name="testnit">
-		<resource name="RAM" quantum="4M"/>
-	</start>
 	<start name="vmm">
 		<resource name="RAM" quantum="4M"/>
+	</start>
+	<start name="qt_vmm">
+		<resource name="RAM" quantum="2G"/>
+		<provides><service name="Vmmgui"/></provides>
 	</start>
 </config>}
 
@@ -95,10 +96,24 @@ set boot_modules {
 	init
 	timer
 	nitpicker
-	testnit
 	vmm
 	linux
 	initrd.gz
+	qt_vmm
+	dejavusans.lib.so
+	freetype.lib.so
+	jpeg.lib.so
+	ld.lib.so
+	libc.lib.so
+	libc_lock_pipe.lib.so
+	libm.lib.so
+	libpng.lib.so
+	qnitpickerviewwidget.lib.so
+	qt_core.lib.so
+	qt_gui.lib.so
+	qt_xml.lib.so
+	stdcxx.lib.so
+	zlib.lib.so
 }
 
 lappend_if [have_spec imx53] boot_modules imx53_gpio_drv

@@ -200,8 +200,7 @@ proc loadaddr { } {
 proc build_boot_uimage { } {
 	if {[have_spec uboot]} {
 		exec [cross_dev_prefix]objcopy -O binary [run_dir]/image.elf [run_dir]/image.bin
-		exec gzip --best --force [run_dir]/image.bin
-		exec mkimage -A arm -O linux -T kernel -C gzip -a [loadaddr] -e [entrypoint] -d [run_dir]/image.bin.gz [run_dir]/uImage
+		exec mkimage -A arm -O linux -T kernel -C none -a [loadaddr] -e [entrypoint] -d [run_dir]/image.bin [run_dir]/uImage
 	}
 }
 
