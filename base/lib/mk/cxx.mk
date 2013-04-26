@@ -56,6 +56,17 @@ KEEP_SYMBOLS += _ZTVN10__cxxabiv119__pointer_type_infoE
 KEEP_SYMBOLS += _ZTSN10__cxxabiv120__function_type_infoE
 
 #
+# Include dependency files for the corresponding object files except
+# when cleaning
+# Normally, this is already fulfilled by a corresponding rule in generic.mk.
+# Due to the fact, that the CXX_OBJECTS variable is used here instead of the
+# OBJECTS variable, that rule has to be defined for CXX_OBJECTS too.
+#
+ifneq ($(filter-out $(MAKECMDGOALS),clean),)
+-include $(CXX_OBJECTS:.o=.d)
+endif
+
+#
 # Rule to link all libc definitions and libsupc++ libraries
 # and to hide after that the exported libc symbols
 #
