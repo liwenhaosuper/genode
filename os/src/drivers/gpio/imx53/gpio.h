@@ -1,12 +1,13 @@
 /*
  * \brief  Gpio driver for the i.MX53
  * \author Nikolay Golikov <nik@ksyslabs.org>
+ * \author Stefan Kalkowski <stefan.kalkowski@genode-labs.com>
  * \date   2012-12-06
  */
 
 /*
  * Copyright (C) 2012 Ksys Labs LLC
- * Copyright (C) 2012 Genode Labs GmbH
+ * Copyright (C) 2012-2013 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -15,14 +16,16 @@
 #ifndef _GPIO_H_
 #define _GPIO_H_
 
-
 /* Genode includes */
+#include <os/attached_io_mem_dataspace.h>
 #include <util/mmio.h>
 
-
-struct Gpio_reg : Genode::Mmio
+struct Gpio_reg : Genode::Attached_io_mem_dataspace, Genode::Mmio
 {
-	Gpio_reg(Genode::addr_t const mmio_base) : Genode::Mmio(mmio_base) { }
+	Gpio_reg(Genode::addr_t const mmio_base,
+	         Genode::size_t const mmio_size)
+	: Genode::Attached_io_mem_dataspace(mmio_base, mmio_size),
+	  Genode::Mmio((Genode::addr_t)local_addr<void>()) { }
 
 	struct Data : Register_array<0x0, 32, 32, 1>
 	{
@@ -67,4 +70,4 @@ struct Gpio_reg : Genode::Mmio
 	};
 };
 
-#endif
+#endif /* _GPIO_H_ */
